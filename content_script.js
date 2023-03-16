@@ -10,6 +10,20 @@ const TRANSCRIPTION_PROMPT =
 const MICROPHONE_BUTTON_CLASSES =
     'absolute p-1 rounded-md text-gray-500 bottom-1.5 right-1 md:bottom-2.5 md:right-2 hover:bg-gray-100 dark:hover:text-gray-400 dark:hover:bg-gray-900';
 
+async function retrieveFromStorage(key) {
+    return new Promise((resolve) => {
+        chrome.storage.sync.get(key, function (result) {
+            resolve(result[key]);
+        });
+    });
+}
+
+async function storeInStorage(key, value) {
+    chrome.storage.sync.set({ [key]: value }, function () {
+        console.log('Value stored:', value);
+    });
+}
+
 class AudioRecorder {
     constructor() {
         this.recording = false;
@@ -31,25 +45,15 @@ class AudioRecorder {
     }
 
     async retrieveToken() {
-        return new Promise((resolve) => {
-            chrome.storage.sync.get('openai_token', function (result) {
-                resolve(result.openai_token);
-            });
-        });
+        return await retrieveFromStorage('openai_token');
     }
 
     async storePrompt(prompt) {
-        chrome.storage.sync.set({ openai_prompt: prompt }, function () {
-            console.log('prompt stored:', prompt);
-        });
+        await storeInStorage('openai_prompt', prompt);
     }
 
     async retrievePrompt() {
-        return new Promise((resolve) => {
-            chrome.storage.sync.get('openai_prompt', function (result) {
-                resolve(result.openai_prompt);
-            });
-        });
+        return await retrieveFromStorage('openai_prompt');
     }
 
     async startRecording() {
@@ -58,10 +62,9 @@ class AudioRecorder {
             this.mediaRecorder = new MediaRecorder(stream);
             let chunks = [];
             this.mediaRecorder.addEventListener('dataavailable', (event) => chunks.push(event.data));
-            this.mediaRecorder.addEventListener('stop', async () => {
-                this.micButton.disabled = true;
-                this.micButton.innerHTML = SVG_SPINNER_HTML;
 
+            this.mediaRecorder.addEventListener('stop', async () => {
+                this.setButtonState('loading');
                 console.log('recording stop');
                 const audioBlob = new Blob(chunks, { type: 'audio/webm' });
 
@@ -73,7 +76,7 @@ class AudioRecorder {
                     storedPrompt = TRANSCRIPTION_PROMPT;
                     await this.storePrompt(storedPrompt);
                 }
-                console.log('storedPrompt: ', storedPrompt);
+
                 const headers = new Headers({
                     Authorization: `Bearer ${storedToken}`,
                 });
@@ -91,27 +94,25 @@ class AudioRecorder {
 
                 // try {
                 const response = await fetch(TRANSCRIPTION_URL, requestOptions);
-                this.micButton.disabled = false;
+                this.setButtonState('ready');
                 if (response.status === 200) {
                     const result = await response.json();
                     const resultText = result.text;
                     console.log(resultText);
 
                     this.insertTextResult(resultText);
-                    this.micButton.innerHTML = SVG_MIC_HTML;
                     this.recording = false;
                     stream.getTracks().forEach((track) => track.stop());
                 } else {
                     this.insertTextResult(
                         `${response.status} ERROR! API key not provided or OpenAI Server Error! Check the Pop-up window of the Extension to provide API key.`
                     );
-                    this.micButton.innerHTML = SVG_MIC_HTML;
                     this.recording = false;
                     stream.getTracks().forEach((track) => track.stop());
                 }
             });
             this.mediaRecorder.start();
-            this.micButton.innerHTML = SVG_MIC_SPINNING_HTML;
+            this.setButtonState('recording');
             this.recording = true;
         } catch (error) {
             console.error(error);
@@ -141,8 +142,27 @@ class AudioRecorder {
         this.textarea.selectionEnd = this.textarea.selectionStart;
         this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
     }
-}
 
+    setButtonState(state) {
+        const hoverClasses = ['hover:bg-gray-100', 'dark:hover:text-gray-400', 'dark:hover:bg-gray-900'];
+        switch (state) {
+            case 'ready':
+                this.micButton.disabled = false;
+                this.micButton.innerHTML = SVG_MIC_HTML;
+                this.micButton.classList.add(...hoverClasses);
+                break;
+            case 'recording':
+                this.micButton.disabled = false;
+                this.micButton.innerHTML = SVG_MIC_SPINNING_HTML;
+                break;
+            case 'loading':
+                this.micButton.disabled = true;
+                this.micButton.innerHTML = SVG_SPINNER_HTML;
+                this.micButton.classList.remove(...hoverClasses);
+                break;
+        }
+    }
+}
 
 async function init() {
     const textareas = document.querySelectorAll('textarea');
@@ -157,36 +177,39 @@ async function init() {
     });
 
     // Add microphone button to textareas added later
-    const observer = new MutationObserver((mutations) => {
-        mutations.forEach((mutation) => {
-            mutation.addedNodes.forEach((node) => {
-                if (node.tagName === 'TEXTAREA') {
-                    if (!node.parentNode.querySelector('.microphone_button')) {
-                        const recorder = new AudioRecorder();
-                        recorder.textarea = node;
-                        console.log('TEXTAREA addedNodes');
-                        recorder.createMicButton();
-                        node.parentNode.insertBefore(recorder.micButton, node.nextSibling);
-                    }
-                }
-            });
-        });
-    });
+    const observer = new MutationObserver(handleMutations);
 
     observer.observe(document.body, {
         childList: true,
         subtree: true,
     });
 
-    document.addEventListener('click', (event) => {
-        const target = event.target;
-        if (target.nodeName === 'TEXTAREA' && !target.parentNode.querySelector('.microphone_button')) {
-            const recorder = new AudioRecorder();
-            recorder.textarea = target;
-            recorder.createMicButton();
-            target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
-        }
+    document.addEventListener('click', handleClick);
+}
+function handleMutations(mutations) {
+    mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+            if (node.tagName === 'TEXTAREA') {
+                if (!node.parentNode.querySelector('.microphone_button')) {
+                    const recorder = new AudioRecorder();
+                    recorder.textarea = node;
+                    console.log('TEXTAREA addedNodes');
+                    recorder.createMicButton();
+                    node.parentNode.insertBefore(recorder.micButton, node.nextSibling);
+                }
+            }
+        });
     });
+}
+
+function handleClick(event) {
+    const target = event.target;
+    if (target.nodeName === 'TEXTAREA' && !target.parentNode.querySelector('.microphone_button')) {
+        const recorder = new AudioRecorder();
+        recorder.textarea = target;
+        recorder.createMicButton();
+        target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
+    }
 }
 
 init();
