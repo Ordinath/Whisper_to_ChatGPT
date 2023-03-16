@@ -143,6 +143,7 @@ class AudioRecorder {
     }
 }
 
+
 async function init() {
     const textareas = document.querySelectorAll('textarea');
 
