@@ -4,4 +4,6 @@
     padding: 0.3rem 0.5rem; /* Adjust the padding */
     min-width: 1.5rem; /* Set a minimum width */
     text-align: center; /* Center the text */
+    background-color: rgba(0, 0, 0, 0.1);
+    font-weight: bold;
 }

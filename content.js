@@ -34,6 +34,7 @@ class AudioRecorder {
         this.textarea = null;
         this.micButton = null;
         this.token = null;
+        this.promptButtons = [];
     }
 
     createMicButton() {
@@ -52,13 +53,13 @@ class AudioRecorder {
         if (!snippets) return;
 
         const numberOfRows = Math.ceil(snippets.length / 9);
-
+        console.log(numberOfRows);
         snippets.forEach((snippet, index) => {
             if (!snippet) return;
             const button = document.createElement('button');
             button.textContent = index + 1;
             button.className = `snippet_button ${MICROPHONE_BUTTON_CLASSES}`;
-            
+
             // we want to position the buttons in a grid
             // the grid is 9 columns wide and as many rows as needed
             const y = -0.6 - numberOfRows * 2.2 + Math.floor(index / 9) * 2.2;
@@ -70,7 +71,27 @@ class AudioRecorder {
                 this.insertTextResult(snippet);
             });
             this.textarea.parentNode.insertBefore(button, this.textarea.nextSibling);
+            this.promptButtons.push({ button, x, y, initialY: y });
         });
+    }
+
+    updateButtonGridPosition() {
+        const textareaRows = this.textarea.clientHeight / 24;
+
+        if (this.promptButtons) {
+            this.promptButtons.forEach((buttonObj, index) => {
+                buttonObj.y = buttonObj.initialY - (textareaRows - 1) * 1.5;
+                buttonObj.button.style.transform = `translate(${buttonObj.x}rem, ${buttonObj.y}rem)`;
+            });
+        }
+    }
+
+    observeTextareaResize() {
+        this.resizeObserver = new ResizeObserver(() => {
+            console.log('Textarea resized'); // Added console log
+            this.updateButtonGridPosition();
+        });
+        this.resizeObserver.observe(this.textarea);
     }
 
     async retrieveToken() {
@@ -240,6 +261,7 @@ async function handleClick(event) {
         recorder.createMicButton();
         target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
         await recorder.createPromptButtons(); // Call the new method here
+        recorder.observeTextareaResize(); // Add this line to observe the textarea resize
     }
 }
 
