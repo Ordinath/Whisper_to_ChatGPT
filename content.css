@@ -1,0 +1,7 @@
+.snippet_button {
+    position: absolute;
+    font-size: 0.8rem; /* Smaller font size */
+    padding: 0.3rem 0.5rem; /* Adjust the padding */
+    min-width: 1.5rem; /* Set a minimum width */
+    text-align: center; /* Center the text */
+}
