@@ -1,3 +1,4 @@
+/* global chrome */
 const SVG_MIC_HTML =
     '<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 512 512" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 mr-1" height="1.2em" width="1.2em" style="margin-left:0.2em;" xmlns="http://www.w3.org/2000/svg"> <line x1="192" y1="448" x2="320" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></line> <path d="M384,208v32c0,70.4-57.6,128-128,128h0c-70.4,0-128-57.6-128-128V208" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></path> <line x1="256" y1="368" x2="256" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></line> <path d="M256,320a78.83,78.83,0,0,1-56.55-24.1A80.89,80.89,0,0,1,176,239V128a79.69,79.69,0,0,1,80-80c44.86,0,80,35.14,80,80V239C336,283.66,300.11,320,256,320Z" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></path></svg>';
 const SVG_MIC_SPINNING_HTML =
@@ -8,8 +9,7 @@ const SVG_SPINNER_HTML =
 // const SVG_MIC_SPINNING_HTML = "<svg>{irrelevant}</svg>";
 // const SVG_SPINNER_HTML = "<svg>{irrelevant}</svg>";
 const TRANSCRIPTION_URL = 'https://api.openai.com/v1/audio/transcriptions';
-const TRANSCRIPTION_PROMPT =
-    'The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.';
+const TRANSLATION_URL = 'https://api.openai.com/v1/audio/translations';
 const MICROPHONE_BUTTON_CLASSES =
     'absolute p-1 rounded-md text-gray-500 bottom-1.5 right-1 md:bottom-2.5 md:right-2 hover:bg-gray-100 dark:hover:text-gray-400 dark:hover:bg-gray-900';
 
@@ -21,12 +21,6 @@ async function retrieveFromStorage(key) {
     });
 }
 
-async function storeInStorage(key, value) {
-    chrome.storage.sync.set({ [key]: value }, function () {
-        console.log('Value stored:', value);
-    });
-}
-
 class AudioRecorder {
     constructor() {
         this.recording = false;
@@ -34,7 +28,7 @@ class AudioRecorder {
         this.textarea = null;
         this.micButton = null;
         this.token = null;
-        this.promptButtons = [];
+        this.snippetButtons = [];
     }
 
     createMicButton() {
@@ -48,8 +42,8 @@ class AudioRecorder {
         });
     }
 
-    async createPromptButtons() {
-        const snippets = await retrieveFromStorage('openai_snippets');
+    async createSnippetButtons() {
+        const snippets = await retrieveFromStorage('snippets');
         if (!snippets) return;
 
         const numberOfRows = Math.ceil(snippets.length / 9);
@@ -71,15 +65,15 @@ class AudioRecorder {
                 this.insertTextResult(snippet);
             });
             this.textarea.parentNode.insertBefore(button, this.textarea.nextSibling);
-            this.promptButtons.push({ button, x, y, initialY: y });
+            this.snippetButtons.push({ button, x, y, initialY: y });
         });
     }
 
     updateButtonGridPosition() {
         const textareaRows = this.textarea.clientHeight / 24;
 
-        if (this.promptButtons) {
-            this.promptButtons.forEach((buttonObj, index) => {
+        if (this.snippetButtons) {
+            this.snippetButtons.forEach((buttonObj, index) => {
                 buttonObj.y = buttonObj.initialY - (textareaRows - 1) * 1.5;
                 buttonObj.button.style.transform = `translate(${buttonObj.x}rem, ${buttonObj.y}rem)`;
             });
@@ -94,20 +88,45 @@ class AudioRecorder {
         this.resizeObserver.observe(this.textarea);
     }
 
-    async retrieveDownloadToggle() {
-        return await retrieveFromStorage('config_download_toggle');
+    async downloadEnabled() {
+        const downloadEnabled = await retrieveFromStorage('config_enable_download');
+        console.log('downloadEnabled', downloadEnabled);
+        return downloadEnabled;
+    }
+
+    async translationEnabled() {
+        const translationEnabled = await retrieveFromStorage('config_enable_translation');
+        console.log('translationEnabled', translationEnabled);
+        return translationEnabled;
+    }
+
+    async snippetsEnabled() {
+        const snippetsEnabled = await retrieveFromStorage('config_enable_snippets');
+        console.log('snippetsEnabled', snippetsEnabled);
+        return snippetsEnabled;
     }
 
     async retrieveToken() {
         return await retrieveFromStorage('openai_token');
     }
 
-    async storePrompt(prompt) {
-        await storeInStorage('openai_prompt', prompt);
+    async getPrompts() {
+        const prompts = await retrieveFromStorage('openai_prompts');
+        console.log('prompts', prompts);
+        return prompts;
+    }
+    async setSelectedPrompt() {
+        const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
+        console.log('selectedPrompt', selectedPrompt);
+        return selectedPrompt;
     }
 
-    async retrievePrompt() {
-        return await retrieveFromStorage('openai_prompt');
+    async getSelectedPrompt() {
+        const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
+        const prompts = await retrieveFromStorage('openai_prompts');
+        console.log('selectedPrompt', selectedPrompt);
+        console.log('prompts', prompts);
+        return prompts[selectedPrompt];
     }
 
     async startRecording() {
@@ -124,17 +143,13 @@ class AudioRecorder {
 
                 const file = audioBlob;
 
-                // retrieveDownloadToggle
-                if (await this.retrieveDownloadToggle()) {
+                if (await this.downloadEnabled()) {
                     downloadFile(file);
                 }
 
                 const storedToken = await this.retrieveToken();
-                let storedPrompt = await this.retrievePrompt();
-                if (!storedPrompt) {
-                    storedPrompt = TRANSCRIPTION_PROMPT;
-                    await this.storePrompt(storedPrompt);
-                }
+                const storedPrompt = await this.getSelectedPrompt();
+                console.log('storedPrompt', storedPrompt);
 
                 const headers = new Headers({
                     Authorization: `Bearer ${storedToken}`,
@@ -142,7 +157,7 @@ class AudioRecorder {
                 const formData = new FormData();
                 formData.append('file', file, 'recording.webm');
                 formData.append('model', 'whisper-1');
-                formData.append('prompt', storedPrompt);
+                formData.append('prompt', storedPrompt.content);
 
                 const requestOptions = {
                     method: 'POST',
@@ -151,8 +166,9 @@ class AudioRecorder {
                     redirect: 'follow',
                 };
 
-                // try {
-                const response = await fetch(TRANSCRIPTION_URL, requestOptions);
+                const requestUrl = (await this.translationEnabled()) ? TRANSLATION_URL : TRANSCRIPTION_URL;
+
+                const response = await fetch(requestUrl, requestOptions);
                 this.setButtonState('ready');
                 if (response.status === 200) {
                     const result = await response.json();
@@ -205,11 +221,6 @@ class AudioRecorder {
     setButtonState(state) {
         const hoverClasses = ['hover:bg-gray-100', 'dark:hover:text-gray-400', 'dark:hover:bg-gray-900'];
         switch (state) {
-            case 'ready':
-                this.micButton.disabled = false;
-                this.micButton.innerHTML = SVG_MIC_HTML;
-                this.micButton.classList.add(...hoverClasses);
-                break;
             case 'recording':
                 this.micButton.disabled = false;
                 this.micButton.innerHTML = SVG_MIC_SPINNING_HTML;
@@ -218,6 +229,12 @@ class AudioRecorder {
                 this.micButton.disabled = true;
                 this.micButton.innerHTML = SVG_SPINNER_HTML;
                 this.micButton.classList.remove(...hoverClasses);
+                break;
+            case 'ready':
+            default:
+                this.micButton.disabled = false;
+                this.micButton.innerHTML = SVG_MIC_HTML;
+                this.micButton.classList.add(...hoverClasses);
                 break;
         }
     }
@@ -232,7 +249,10 @@ async function init() {
             recorder.textarea = textarea;
             recorder.createMicButton();
             textarea.parentNode.insertBefore(recorder.micButton, textarea.nextSibling);
-            // await recorder.createPromptButtons(); // Call the new method here
+            if (await recorder.snippetsEnabled()) {
+                await recorder.createSnippetButtons();
+                recorder.observeTextareaResize();
+            }
         }
     });
 
@@ -288,8 +308,10 @@ async function handleClick(event) {
         recorder.textarea = target;
         recorder.createMicButton();
         target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
-        // await recorder.createPromptButtons(); // Call the new method here
-        recorder.observeTextareaResize(); // Add this line to observe the textarea resize
+        if (await recorder.snippetsEnabled()) {
+            await recorder.createSnippetButtons();
+            recorder.observeTextareaResize();
+        }
     }
 }
 

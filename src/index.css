@@ -1,0 +1,8 @@
+@font-face {
+    font-family: 'Ubuntu Mono';
+    src: local('UbuntuMono-Regular'), url(./fonts/UbuntuMono-Regular.ttf) format('truetype');
+}
+
+body {
+    background-color: rgb(51, 49, 53);
+}

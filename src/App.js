@@ -1,30 +1,21 @@
 /* global chrome */
 import React, { useState, useEffect } from 'react';
-import {
-    CssBaseline,
-    Box,
-    TextField,
-    Button,
-    Typography,
-    FormControlLabel,
-    Switch,
-    FormHelperText,
-    MenuItem,
-    Select,
-    FormControl,
-    InputLabel,
-} from '@mui/material';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { themeOptions } from './themeOptions';
-import WebFont from 'webfontloader';
-
-// console.log(chrome);
-
-WebFont.load({
-    google: {
-        families: ['Droid Sans', 'Droid Serif', 'Ubuntu Mono', 'Open Sans', 'Lexend'],
-    },
-});
+import CssBaseline from '@mui/material/CssBaseline';
+import Box from '@mui/material/Box';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import FormHelperText from '@mui/material/FormHelperText';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Divider from '@mui/material/Divider';
+import ThemeProvider from '@mui/material/styles/ThemeProvider';
+import createTheme from '@mui/material/styles/createTheme';
+import themeOptions from './themeOptions';
 
 const darkTheme = createTheme(themeOptions);
 
@@ -43,8 +34,18 @@ function App() {
     // retrieve stored data (backwards compatibilly with old version)
     useEffect(() => {
         chrome.storage?.sync.get(
-            ['openai_token', 'openai_prompts', 'openai_prompt', 'config_enable_translation', 'config_enable_download', 'config_enable_snippets', 'snippets'],
+            [
+                'openai_token',
+                'openai_prompts',
+                'openai_selected_prompt',
+                'openai_prompt',
+                'config_enable_translation',
+                'config_enable_download',
+                'config_enable_snippets',
+                'snippets',
+            ],
             (result) => {
+                console.log('Config retrieved:', result);
                 if (result.openai_token) {
                     setToken(result.openai_token);
                 }
@@ -55,6 +56,16 @@ function App() {
                     if (!result.openai_prompts) {
                         setPrompts([{ title: 'Initial prompt', content: result.openai_prompt }]);
                         setSelectedPrompt(0);
+                        setPromptTitle('Initial prompt');
+                        setPromptContent(result.openai_prompt);
+                        chrome.storage?.sync.set(
+                            {
+                                openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
+                            },
+                            () => {
+                                console.log('Config stored');
+                            }
+                        );
                     }
                 }
                 if (result.openai_prompts) {
@@ -62,6 +73,27 @@ function App() {
                     setSelectedPrompt(0);
                     setPromptTitle(result.openai_prompts[0]?.title || '');
                     setPromptContent(result.openai_prompts[0]?.content || '');
+                }
+                // fisrt launch of extention
+                if (!result.openai_prompts && !result.openai_prompt) {
+                    const initialPrompt = `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`;
+                    setPrompts([{ title: 'Initial prompt', content: initialPrompt }]);
+                    setSelectedPrompt(0);
+                    setPromptTitle('Initial prompt');
+                    setPromptContent(initialPrompt);
+                    chrome.storage?.sync.set(
+                        {
+                            openai_prompts: [{ title: 'Initial prompt', content: initialPrompt }],
+                        },
+                        () => {
+                            console.log('Config stored');
+                        }
+                    );
+                }
+                if (result.openai_selected_prompt) {
+                    setSelectedPrompt(result.openai_selected_prompt);
+                    setPromptTitle(result.openai_prompts[result.openai_selected_prompt]?.title || '');
+                    setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
                 }
                 if (result.config_enable_translation) {
                     setTranslationEnabled(result.config_enable_translation);
@@ -80,57 +112,85 @@ function App() {
         );
     }, []);
 
-    // update prompt title and content when selected prompt changes
+    // update prompt title and content when selected prompt changes (just in case you forget to click save)
     useEffect(() => {
         if (selectedPrompt >= 0) {
             const promptsCopy = [...prompts];
             promptsCopy[selectedPrompt] = { title: promptTitle, content: promptContent };
             setPrompts(promptsCopy);
             console.log('Prompt changed:', { prompts });
-            chrome.storage?.sync.set(
-                {
-                    openai_prompts: prompts,
-                },
-                () => {
-                    console.log('Config stored:', { prompts, selectedPrompt });
-                }
-            );
+            const timeout = setTimeout(() => {
+                chrome.storage?.sync.set(
+                    {
+                        openai_prompts: prompts,
+                    },
+                    () => {
+                        console.log('Config stored:', { prompts, selectedPrompt });
+                    }
+                );
+            }, 500);
+            return () => clearTimeout(timeout);
         }
     }, [promptTitle, promptContent]);
 
     // update chrome storage when snippet fields change
+    // we need to debounce this because it should not be called on every keystroke
     useEffect(() => {
         const snippetsTexts = snippetFields.map((field) => field.value);
-        chrome.storage?.sync.set(
-            {
-                snippets: snippetsTexts,
-            },
-            () => {
-                console.log('Config stored:', { snippets: snippetsTexts });
-            }
-        );
+        const timeout = setTimeout(() => {
+            chrome.storage?.sync.set(
+                {
+                    snippets: snippetsTexts,
+                },
+                () => {
+                    console.log('Config stored:', { snippets: snippetsTexts });
+                }
+            );
+        }, 500);
+        return () => clearTimeout(timeout);
     }, [snippetFields]);
 
     const handleSelectedPromptChange = (event) => {
         setSelectedPrompt(event.target.value);
         setPromptTitle(prompts[event.target.value]?.title || '');
         setPromptContent(prompts[event.target.value]?.content || '');
+        const timeout = setTimeout(() => {
+            chrome.storage?.sync.set(
+                {
+                    openai_selected_prompt: event.target.value,
+                },
+                () => {
+                    console.log('Config stored:', { selectedPrompt: event.target.value });
+                }
+            );
+        }, 500);
+        return () => clearTimeout(timeout);
     };
 
-    const handleSavePrompt = () => {};
+    const handleSavePrompt = () => {
+        const promptsCopy = [...prompts];
+        promptsCopy[selectedPrompt] = { title: promptTitle, content: promptContent };
+        setPrompts(promptsCopy);
+        chrome.storage?.sync.set(
+            {
+                openai_prompts: promptsCopy,
+            },
+            () => {
+                console.log('Config stored:', { token, prompts: promptsCopy });
+            }
+        );
+    };
 
     const handleRemovePrompt = () => {
         if (selectedPrompt >= 0) {
             const promptsCopy = prompts.filter((_, i) => i !== selectedPrompt);
             setPrompts(promptsCopy);
-            setSelectedPrompt(prompts[0] || -1);
-            setPromptTitle(prompts[0]?.title || '');
-            setPromptContent(prompts[0]?.content || '');
+            setSelectedPrompt(-1);
+            setPromptTitle('');
+            setPromptContent('');
 
-            // eslint-disable-next-line no-undef
             chrome.storage?.sync.set(
                 {
-                    openai_token: token,
                     openai_prompts: promptsCopy,
                 },
                 () => {
@@ -158,18 +218,21 @@ function App() {
             console.log('Config stored:', { config_enable_translation: event.target.checked });
         });
     };
+
     const handleToggleDownload = (event) => {
         setDownloadEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_download: event.target.checked }, () => {
             console.log('Config stored:', { config_enable_download: event.target.checked });
         });
     };
+
     const handleToggleSnippets = (event) => {
         setSnippetsEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_snippets: event.target.checked }, () => {
             console.log('Config stored:', { config_enable_snippets: event.target.checked });
         });
     };
+
     const handleTokenChange = (event) => {
         setToken(event.target.value);
         chrome.storage?.sync.set({ openai_token: event.target.value }, () => {
@@ -181,8 +244,8 @@ function App() {
         <>
             <ThemeProvider theme={darkTheme}>
                 <CssBaseline />
-                <Box display="flex" flexWrap="wrap" width="25rem" gap=".5rem" margin="1rem">
-                    <Box width="100%">
+                <Box display="flex" flexWrap="wrap" width="25rem" gap=".5rem" margin="1rem" paddingRight={2} alignItems="center">
+                    <Box width="100%" paddingBottom={1}>
                         <TextField
                             fullWidth
                             label="OpenAI API Token"
@@ -194,27 +257,29 @@ function App() {
                             type={token.length > 0 ? 'password' : 'text'}
                         />
                     </Box>
-                    <Box width="100%">
-                        {/* <TextField
-                            label="Whisper API Prompt"
-                            id="prompt"
-                            fullWidth
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            helperText="Boost words recognition"
-                            size="small"
-                            multiline
-                            minRows={10}
-                        /> */}
+                    <Divider
+                        component="div"
+                        sx={{
+                            width: '100%',
+                            height: '1px',
+                        }}
+                    />
+                    <Box width="100%" paddingTop={1}>
                         <FormControl fullWidth>
                             <InputLabel id="select-prompt-label">Select Prompt</InputLabel>
-                            <Select labelId="select-prompt-label" value={selectedPrompt} onChange={handleSelectedPromptChange} size="small">
+                            <Select
+                                label="Select Prompt"
+                                labelId="select-prompt-label"
+                                value={selectedPrompt}
+                                onChange={handleSelectedPromptChange}
+                                size="small"
+                            >
                                 {prompts.map((_prompt, index) => (
                                     <MenuItem key={index} value={index}>
                                         {_prompt.title || 'Untitled'}
                                     </MenuItem>
                                 ))}
-                                <MenuItem value={prompts.length}>Add Prompt</MenuItem>
+                                <MenuItem value={prompts.length}>Add New Prompt</MenuItem>
                             </Select>
                         </FormControl>
                     </Box>
@@ -228,21 +293,33 @@ function App() {
                             fullWidth
                             value={promptContent}
                             onChange={(e) => setPromptContent(e.target.value)}
-                            helperText="Boost words recognition"
+                            helperText="Boost words recognition according to provided context."
                             size="small"
                             multiline
                             minRows={10}
                         />
                     </Box>
-                    <Box flexGrow={1}>
+                    <Box flexGrow={1} paddingBottom={1}>
                         <Button onClick={handleSavePrompt} fullWidth variant="outlined">
                             Save Prompt
                         </Button>
                     </Box>
-                    <Box>
-                        <Button onClick={handleRemovePrompt} variant="outlined">
+                    <Box paddingBottom={1}>
+                        <Button onClick={handleRemovePrompt} color="error" variant="outlined">
                             Remove Prompt
                         </Button>
+                    </Box>
+                    <Divider
+                        component="div"
+                        sx={{
+                            width: '100%',
+                            height: '1px',
+                        }}
+                    />
+                    <Box width="100%" paddingTop={1}>
+                        <Typography variant="h5" textAlign="center">
+                            Config:
+                        </Typography>
                     </Box>
                     <Box width="100%">
                         <FormControlLabel control={<Switch checked={translationEnabled} onChange={handleToggleTranslation} />} label="Enable Translation" />
@@ -254,12 +331,12 @@ function App() {
                     </Box>
                     <Box width="100%">
                         <FormControlLabel control={<Switch checked={snippetsEnabled} onChange={handleToggleSnippets} />} label="Enable Snippets (Beta)" />
-                        <FormHelperText>Requires page refresh. Only tested on desktop version.</FormHelperText>
+                        <FormHelperText>Requires page refresh on toggle. Only tested on desktop version.</FormHelperText>
                     </Box>
                     {snippetsEnabled && (
                         <>
                             <Box width="100%">
-                                <Typography variant="subtitle1">Predefined Prompts:</Typography>
+                                <Typography variant="subtitle1">Predefined Snippets:</Typography>
                             </Box>
                             {snippetFields.map((field) => (
                                 <>
@@ -275,13 +352,15 @@ function App() {
                                         />
                                     </Box>
                                     <Box>
-                                        <Button onClick={() => handleRemoveSnippet(field.id)}>Remove</Button>
+                                        <Button variant="outlined" color='error' onClick={() => handleRemoveSnippet(field.id)}>
+                                            Remove
+                                        </Button>
                                     </Box>
                                 </>
                             ))}
                             <Box width="100%">
-                                <Button onClick={handleAddSnippet} fullWidth>
-                                    Add Prompt
+                                <Button variant="outlined" onClick={handleAddSnippet} fullWidth>
+                                    Add Snippet
                                 </Button>
                             </Box>
                         </>

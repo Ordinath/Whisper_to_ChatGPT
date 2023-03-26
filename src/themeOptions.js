@@ -1,4 +1,4 @@
-export const themeOptions = {
+const themeOptions = {
     palette: {
         mode: 'dark',
         primary: {
@@ -13,7 +13,7 @@ export const themeOptions = {
         },
     },
     typography: {
-        fontFamily: 'Ubuntu Mono',
+        fontFamily: 'Ubuntu Mono, Open Sans',
         h1: {
             fontFamily: 'Ubuntu Mono',
         },
@@ -109,3 +109,5 @@ export const themeOptions = {
     },
     spacing: 8,
 };
+
+export default themeOptions;
