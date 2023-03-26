@@ -45,7 +45,7 @@ function App() {
                 'snippets',
             ],
             (result) => {
-                console.log('Config retrieved:', result);
+                // console.log('Config retrieved:', result);
                 if (result.openai_token) {
                     setToken(result.openai_token);
                 }
@@ -63,7 +63,7 @@ function App() {
                                 openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
                             },
                             () => {
-                                console.log('Config stored');
+                                // console.log('Config stored');
                             }
                         );
                     }
@@ -86,7 +86,7 @@ function App() {
                             openai_prompts: [{ title: 'Initial prompt', content: initialPrompt }],
                         },
                         () => {
-                            console.log('Config stored');
+                            // console.log('Config stored');
                         }
                     );
                 }
@@ -118,14 +118,14 @@ function App() {
             const promptsCopy = [...prompts];
             promptsCopy[selectedPrompt] = { title: promptTitle, content: promptContent };
             setPrompts(promptsCopy);
-            console.log('Prompt changed:', { prompts });
+            // console.log('Prompt changed:', { prompts });
             const timeout = setTimeout(() => {
                 chrome.storage?.sync.set(
                     {
                         openai_prompts: prompts,
                     },
                     () => {
-                        console.log('Config stored:', { prompts, selectedPrompt });
+                        // console.log('Config stored:', { prompts, selectedPrompt });
                     }
                 );
             }, 500);
@@ -143,7 +143,7 @@ function App() {
                     snippets: snippetsTexts,
                 },
                 () => {
-                    console.log('Config stored:', { snippets: snippetsTexts });
+                    // console.log('Config stored:', { snippets: snippetsTexts });
                 }
             );
         }, 500);
@@ -160,7 +160,7 @@ function App() {
                     openai_selected_prompt: event.target.value,
                 },
                 () => {
-                    console.log('Config stored:', { selectedPrompt: event.target.value });
+                    // console.log('Config stored:', { selectedPrompt: event.target.value });
                 }
             );
         }, 500);
@@ -176,7 +176,7 @@ function App() {
                 openai_prompts: promptsCopy,
             },
             () => {
-                console.log('Config stored:', { token, prompts: promptsCopy });
+                // console.log('Config stored:', { token, prompts: promptsCopy });
             }
         );
     };
@@ -194,7 +194,7 @@ function App() {
                     openai_prompts: promptsCopy,
                 },
                 () => {
-                    console.log('Config stored:', { token, prompts: promptsCopy });
+                    // console.log('Config stored:', { token, prompts: promptsCopy });
                 }
             );
         }
@@ -215,28 +215,28 @@ function App() {
     const handleToggleTranslation = (event) => {
         setTranslationEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_translation: event.target.checked }, () => {
-            console.log('Config stored:', { config_enable_translation: event.target.checked });
+            // console.log('Config stored:', { config_enable_translation: event.target.checked });
         });
     };
 
     const handleToggleDownload = (event) => {
         setDownloadEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_download: event.target.checked }, () => {
-            console.log('Config stored:', { config_enable_download: event.target.checked });
+            // console.log('Config stored:', { config_enable_download: event.target.checked });
         });
     };
 
     const handleToggleSnippets = (event) => {
         setSnippetsEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_snippets: event.target.checked }, () => {
-            console.log('Config stored:', { config_enable_snippets: event.target.checked });
+            // console.log('Config stored:', { config_enable_snippets: event.target.checked });
         });
     };
 
     const handleTokenChange = (event) => {
         setToken(event.target.value);
         chrome.storage?.sync.set({ openai_token: event.target.value }, () => {
-            console.log('Config stored:', { openai_token: event.target.value });
+            // console.log('Config stored:', { openai_token: event.target.value });
         });
     };
 

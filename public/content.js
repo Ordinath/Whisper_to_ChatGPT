@@ -47,7 +47,7 @@ class AudioRecorder {
         if (!snippets) return;
 
         const numberOfRows = Math.ceil(snippets.length / 9);
-        console.log(numberOfRows);
+        // console.log(numberOfRows);
         snippets.forEach((snippet, index) => {
             if (!snippet) return;
             const button = document.createElement('button');
@@ -82,7 +82,7 @@ class AudioRecorder {
 
     observeTextareaResize() {
         this.resizeObserver = new ResizeObserver(() => {
-            console.log('Textarea resized'); // Added console log
+            // console.log('Textarea resized'); // Added console log
             this.updateButtonGridPosition();
         });
         this.resizeObserver.observe(this.textarea);
@@ -90,19 +90,19 @@ class AudioRecorder {
 
     async downloadEnabled() {
         const downloadEnabled = await retrieveFromStorage('config_enable_download');
-        console.log('downloadEnabled', downloadEnabled);
+        // console.log('downloadEnabled', downloadEnabled);
         return downloadEnabled;
     }
 
     async translationEnabled() {
         const translationEnabled = await retrieveFromStorage('config_enable_translation');
-        console.log('translationEnabled', translationEnabled);
+        // console.log('translationEnabled', translationEnabled);
         return translationEnabled;
     }
 
     async snippetsEnabled() {
         const snippetsEnabled = await retrieveFromStorage('config_enable_snippets');
-        console.log('snippetsEnabled', snippetsEnabled);
+        // console.log('snippetsEnabled', snippetsEnabled);
         return snippetsEnabled;
     }
 
@@ -112,20 +112,20 @@ class AudioRecorder {
 
     async getPrompts() {
         const prompts = await retrieveFromStorage('openai_prompts');
-        console.log('prompts', prompts);
+        // console.log('prompts', prompts);
         return prompts;
     }
     async setSelectedPrompt() {
         const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
-        console.log('selectedPrompt', selectedPrompt);
+        // console.log('selectedPrompt', selectedPrompt);
         return selectedPrompt;
     }
 
     async getSelectedPrompt() {
         const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
         const prompts = await retrieveFromStorage('openai_prompts');
-        console.log('selectedPrompt', selectedPrompt);
-        console.log('prompts', prompts);
+        console.log('Selected Prompt', prompts[selectedPrompt]);
+        // console.log('prompts', prompts);
         return prompts[selectedPrompt];
     }
 
@@ -149,7 +149,7 @@ class AudioRecorder {
 
                 const storedToken = await this.retrieveToken();
                 const storedPrompt = await this.getSelectedPrompt();
-                console.log('storedPrompt', storedPrompt);
+                // console.log('storedPrompt', storedPrompt);
 
                 const headers = new Headers({
                     Authorization: `Bearer ${storedToken}`,
@@ -292,7 +292,7 @@ function handleMutations(mutations) {
                 if (!node.parentNode.querySelector('.microphone_button')) {
                     const recorder = new AudioRecorder();
                     recorder.textarea = node;
-                    console.log('TEXTAREA addedNodes');
+                    // console.log('TEXTAREA addedNodes');
                     recorder.createMicButton();
                     node.parentNode.insertBefore(recorder.micButton, node.nextSibling);
                 }
