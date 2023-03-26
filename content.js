@@ -94,6 +94,10 @@ class AudioRecorder {
         this.resizeObserver.observe(this.textarea);
     }
 
+    async retrieveDownloadToggle() {
+        return await retrieveFromStorage('config_download_toggle');
+    }
+
     async retrieveToken() {
         return await retrieveFromStorage('openai_token');
     }
@@ -119,6 +123,11 @@ class AudioRecorder {
                 const audioBlob = new Blob(chunks, { type: 'audio/webm' });
 
                 const file = audioBlob;
+
+                // retrieveDownloadToggle
+                if (await this.retrieveDownloadToggle()) {
+                    downloadFile(file);
+                }
 
                 const storedToken = await this.retrieveToken();
                 let storedPrompt = await this.retrievePrompt();
@@ -223,7 +232,7 @@ async function init() {
             recorder.textarea = textarea;
             recorder.createMicButton();
             textarea.parentNode.insertBefore(recorder.micButton, textarea.nextSibling);
-            await recorder.createPromptButtons(); // Call the new method here
+            // await recorder.createPromptButtons(); // Call the new method here
         }
     });
 
@@ -237,6 +246,25 @@ async function init() {
 
     document.addEventListener('click', handleClick);
 }
+
+function downloadFile(file) {
+    // set a fileName containing the current date and time in readable format (e.g. `Recording 24.03.2023 13:00.webm` for German locale, but `Recording 03/24/2023 01:00 PM.webm` for English locale)
+    const fileName = `Recording ${new Date().toLocaleString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+    })}.webm`;
+
+    // download file
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = fileName;
+    a.click();
+}
+
 function handleMutations(mutations) {
     mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
@@ -260,7 +288,7 @@ async function handleClick(event) {
         recorder.textarea = target;
         recorder.createMicButton();
         target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
-        await recorder.createPromptButtons(); // Call the new method here
+        // await recorder.createPromptButtons(); // Call the new method here
         recorder.observeTextareaResize(); // Add this line to observe the textarea resize
     }
 }
