@@ -33,83 +33,87 @@ function App() {
 
     // retrieve stored data (backwards compatibilly with old version)
     useEffect(() => {
-        chrome.storage?.sync.get(
-            [
-                'openai_token',
-                'openai_prompts',
-                'openai_selected_prompt',
-                'openai_prompt',
-                'config_enable_translation',
-                'config_enable_download',
-                'config_enable_snippets',
-                'snippets',
-            ],
-            (result) => {
-                // console.log('Config retrieved:', result);
-                if (result.openai_token) {
-                    setToken(result.openai_token);
-                }
-                // backwards compatibility with old version (only one prompt)
-                // load the single prompt as the first prompt
-                // if there are no prompts stored yet, meaning this is the first time the extension is used with new version
-                if (result.openai_prompt) {
-                    if (!result.openai_prompts) {
-                        setPrompts([{ title: 'Initial prompt', content: result.openai_prompt }]);
+        const retrieveState = async () => {
+            await chrome.storage?.sync.get(
+                [
+                    'openai_token',
+                    'openai_prompts',
+                    'openai_selected_prompt',
+                    'openai_prompt',
+                    'config_enable_translation',
+                    'config_enable_download',
+                    'config_enable_snippets',
+                    'snippets',
+                ],
+                async (result) => {
+                    console.log('Config retrieved:', { ...result, openai_token: result.openai_token ? '***' : '' });
+                    if (result.openai_token) {
+                        setToken(result.openai_token);
+                    }
+                    // backwards compatibility with old version (only one prompt)
+                    // load the single prompt as the first prompt
+                    // if there are no prompts stored yet, meaning this is the first time the extension is used with new version
+                    if (result.openai_prompt) {
+                        if (!result.openai_prompts) {
+                            setPrompts([{ title: 'Initial prompt', content: result.openai_prompt }]);
+                            setSelectedPrompt(0);
+                            setPromptTitle('Initial prompt');
+                            setPromptContent(result.openai_prompt);
+                            await chrome.storage?.sync.set(
+                                {
+                                    openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
+                                    openai_selected_prompt: 0,
+                                },
+                                () => {
+                                    // console.log('Config stored');
+                                }
+                            );
+                        }
+                    }
+                    if (result.openai_prompts) {
+                        setPrompts(result.openai_prompts);
+                        setSelectedPrompt(0);
+                        setPromptTitle(result.openai_prompts[0]?.title || '');
+                        setPromptContent(result.openai_prompts[0]?.content || '');
+                    }
+                    // fisrt launch of extention
+                    if (!result.openai_prompts && !result.openai_prompt) {
+                        const initialPrompt = `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`;
+                        setPrompts([{ title: 'Initial prompt', content: initialPrompt }]);
                         setSelectedPrompt(0);
                         setPromptTitle('Initial prompt');
-                        setPromptContent(result.openai_prompt);
-                        chrome.storage?.sync.set(
+                        setPromptContent(initialPrompt);
+                        await chrome.storage?.sync.set(
                             {
-                                openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
+                                openai_prompts: [{ title: 'Initial prompt', content: initialPrompt }],
                             },
                             () => {
                                 // console.log('Config stored');
                             }
                         );
                     }
+                    if (result.openai_selected_prompt) {
+                        setSelectedPrompt(result.openai_selected_prompt);
+                        setPromptTitle(result.openai_prompts[result.openai_selected_prompt]?.title || '');
+                        setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
+                    }
+                    if (result.config_enable_translation) {
+                        setTranslationEnabled(result.config_enable_translation);
+                    }
+                    if (result.config_enable_download) {
+                        setDownloadEnabled(result.config_enable_download);
+                    }
+                    if (result.config_enable_snippets) {
+                        setSnippetsEnabled(result.config_enable_snippets);
+                    }
+                    if (result.snippets) {
+                        // setSnippets(result.snippets);
+                        setSnippetFields(result.snippets.map((snippet, index) => ({ id: index, value: snippet })));
+                    }
                 }
-                if (result.openai_prompts) {
-                    setPrompts(result.openai_prompts);
-                    setSelectedPrompt(0);
-                    setPromptTitle(result.openai_prompts[0]?.title || '');
-                    setPromptContent(result.openai_prompts[0]?.content || '');
-                }
-                // fisrt launch of extention
-                if (!result.openai_prompts && !result.openai_prompt) {
-                    const initialPrompt = `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`;
-                    setPrompts([{ title: 'Initial prompt', content: initialPrompt }]);
-                    setSelectedPrompt(0);
-                    setPromptTitle('Initial prompt');
-                    setPromptContent(initialPrompt);
-                    chrome.storage?.sync.set(
-                        {
-                            openai_prompts: [{ title: 'Initial prompt', content: initialPrompt }],
-                        },
-                        () => {
-                            // console.log('Config stored');
-                        }
-                    );
-                }
-                if (result.openai_selected_prompt) {
-                    setSelectedPrompt(result.openai_selected_prompt);
-                    setPromptTitle(result.openai_prompts[result.openai_selected_prompt]?.title || '');
-                    setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
-                }
-                if (result.config_enable_translation) {
-                    setTranslationEnabled(result.config_enable_translation);
-                }
-                if (result.config_enable_download) {
-                    setDownloadEnabled(result.config_enable_download);
-                }
-                if (result.config_enable_snippets) {
-                    setSnippetsEnabled(result.config_enable_snippets);
-                }
-                if (result.snippets) {
-                    // setSnippets(result.snippets);
-                    setSnippetFields(result.snippets.map((snippet, index) => ({ id: index, value: snippet })));
-                }
-            }
-        );
+            );
+        };
+        retrieveState();
     }, []);
 
     // update prompt title and content when selected prompt changes (just in case you forget to click save)
@@ -174,6 +178,7 @@ function App() {
         chrome.storage?.sync.set(
             {
                 openai_prompts: promptsCopy,
+                openai_selected_prompt: selectedPrompt,
             },
             () => {
                 // console.log('Config stored:', { token, prompts: promptsCopy });
@@ -352,7 +357,7 @@ function App() {
                                         />
                                     </Box>
                                     <Box>
-                                        <Button variant="outlined" color='error' onClick={() => handleRemoveSnippet(field.id)}>
+                                        <Button variant="outlined" color="error" onClick={() => handleRemoveSnippet(field.id)}>
                                             Remove
                                         </Button>
                                     </Box>
