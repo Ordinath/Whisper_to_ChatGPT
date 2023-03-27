@@ -117,9 +117,14 @@ class AudioRecorder {
         const prompts = await retrieveFromStorage('openai_prompts');
         // if (!prompts) we initialize the prompts (first time user)
         if (!prompts || !selectedPrompt) {
+            // backwards compatibility with 1.0 version
+            const previousVersionPrompt = await retrieveFromStorage('openai_prompt');
+
             const initialPrompt = {
                 title: 'Initial prompt',
-                content: `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`,
+                content: previousVersionPrompt
+                    ? previousVersionPrompt
+                    : `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`,
             };
             await chrome.storage?.sync.set(
                 {
