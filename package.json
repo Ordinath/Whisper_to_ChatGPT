@@ -1,6 +1,6 @@
 {
     "name": "whisper_to_chatgpt",
-    "version": "1.2.1",
+    "version": "1.2.2",
     "private": true,
     "dependencies": {
         "@emotion/react": "^11.10.6",

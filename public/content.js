@@ -13,6 +13,8 @@ const TRANSLATION_URL = 'https://api.openai.com/v1/audio/translations';
 const MICROPHONE_BUTTON_CLASSES =
     'absolute p-1 rounded-md text-gray-500 bottom-1.5 right-1 md:bottom-2.5 md:right-2 hover:bg-gray-100 dark:hover:text-gray-400 dark:hover:bg-gray-900';
 
+const TESTING = false;
+
 async function retrieveFromStorage(key) {
     return new Promise((resolve) => {
         chrome.storage.sync.get(key, function (result) {
@@ -110,23 +112,28 @@ class AudioRecorder {
         return await retrieveFromStorage('openai_token');
     }
 
-    async getPrompts() {
-        const prompts = await retrieveFromStorage('openai_prompts');
-        // console.log('prompts', prompts);
-        return prompts;
-    }
-    async setSelectedPrompt() {
-        const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
-        // console.log('selectedPrompt', selectedPrompt);
-        return selectedPrompt;
-    }
-
     async getSelectedPrompt() {
         const selectedPrompt = await retrieveFromStorage('openai_selected_prompt');
         const prompts = await retrieveFromStorage('openai_prompts');
-        console.log('Selected Prompt', prompts[selectedPrompt]);
-        // console.log('prompts', prompts);
-        return prompts[selectedPrompt];
+        // if (!prompts) we initialize the prompts (first time user)
+        if (!prompts || !selectedPrompt) {
+            const initialPrompt = {
+                title: 'Initial prompt',
+                content: `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`,
+            };
+            await chrome.storage?.sync.set(
+                {
+                    openai_prompts: [initialPrompt],
+                    openai_selected_prompt: 0,
+                },
+                () => {
+                    // console.log('Config stored');
+                }
+            );
+            return initialPrompt;
+        } else {
+            return prompts[selectedPrompt];
+        }
     }
 
     async startRecording() {
@@ -149,7 +156,7 @@ class AudioRecorder {
 
                 const storedToken = await this.retrieveToken();
                 const storedPrompt = await this.getSelectedPrompt();
-                // console.log('storedPrompt', storedPrompt);
+                console.log('storedPrompt', storedPrompt);
 
                 const headers = new Headers({
                     Authorization: `Bearer ${storedToken}`,
@@ -241,6 +248,9 @@ class AudioRecorder {
 }
 
 async function init() {
+    if (TESTING) {
+        chrome.storage.sync.clear();
+    }
     const textareas = document.querySelectorAll('textarea');
 
     textareas.forEach(async (textarea) => {

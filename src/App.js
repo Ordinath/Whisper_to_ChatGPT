@@ -22,7 +22,7 @@ const darkTheme = createTheme(themeOptions);
 function App() {
     const [token, setToken] = useState('');
     const [prompts, setPrompts] = useState([]);
-    const [selectedPrompt, setSelectedPrompt] = useState(-1);
+    const [selectedPrompt, setSelectedPrompt] = useState('');
     const [snippetFields, setSnippetFields] = useState([]);
     const [translationEnabled, setTranslationEnabled] = useState(false);
     const [downloadEnabled, setDownloadEnabled] = useState(false);
@@ -50,34 +50,27 @@ function App() {
                     if (result.openai_token) {
                         setToken(result.openai_token);
                     }
+
                     // backwards compatibility with old version (only one prompt)
-                    // load the single prompt as the first prompt
-                    // if there are no prompts stored yet, meaning this is the first time the extension is used with new version
-                    if (result.openai_prompt) {
-                        if (!result.openai_prompts) {
-                            setPrompts([{ title: 'Initial prompt', content: result.openai_prompt }]);
-                            setSelectedPrompt(0);
-                            setPromptTitle('Initial prompt');
-                            setPromptContent(result.openai_prompt);
-                            await chrome.storage?.sync.set(
-                                {
-                                    openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
-                                    openai_selected_prompt: 0,
-                                },
-                                () => {
-                                    // console.log('Config stored');
-                                }
-                            );
-                        }
-                    }
-                    if (result.openai_prompts) {
-                        setPrompts(result.openai_prompts);
+                    // first launch of new version
+                    if (result.openai_prompt && !result.openai_prompts && !result.openai_selected_prompt) {
+                        setPrompts([{ title: 'Initial prompt', content: result.openai_prompt }]);
                         setSelectedPrompt(0);
-                        setPromptTitle(result.openai_prompts[0]?.title || '');
-                        setPromptContent(result.openai_prompts[0]?.content || '');
+                        setPromptTitle('Initial prompt');
+                        setPromptContent(result.openai_prompt);
+                        await chrome.storage?.sync.set(
+                            {
+                                openai_prompts: [{ title: 'Initial prompt', content: result.openai_prompt }],
+                                openai_selected_prompt: 0,
+                            },
+                            () => {
+                                // console.log('Config stored');
+                            }
+                        );
                     }
-                    // fisrt launch of extention
-                    if (!result.openai_prompts && !result.openai_prompt) {
+
+                    // first launch ever
+                    if (!result.openai_prompt && !result.openai_prompts && !result.openai_selected_prompt) {
                         const initialPrompt = `The transcript is about OpenAI which makes technology like DALL·E, GPT-3, and ChatGPT with the hope of one day building an AGI system that benefits all of humanity.`;
                         setPrompts([{ title: 'Initial prompt', content: initialPrompt }]);
                         setSelectedPrompt(0);
@@ -86,17 +79,22 @@ function App() {
                         await chrome.storage?.sync.set(
                             {
                                 openai_prompts: [{ title: 'Initial prompt', content: initialPrompt }],
+                                openai_selected_prompt: 0,
                             },
                             () => {
                                 // console.log('Config stored');
                             }
                         );
                     }
-                    if (result.openai_selected_prompt) {
+
+                    // regular use with saved prompts in new version
+                    if (result.openai_prompts && (result.openai_selected_prompt || result.openai_selected_prompt === 0)) {
+                        setPrompts(result.openai_prompts);
                         setSelectedPrompt(result.openai_selected_prompt);
                         setPromptTitle(result.openai_prompts[result.openai_selected_prompt]?.title || '');
                         setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
                     }
+
                     if (result.config_enable_translation) {
                         setTranslationEnabled(result.config_enable_translation);
                     }
@@ -107,7 +105,6 @@ function App() {
                         setSnippetsEnabled(result.config_enable_snippets);
                     }
                     if (result.snippets) {
-                        // setSnippets(result.snippets);
                         setSnippetFields(result.snippets.map((snippet, index) => ({ id: index, value: snippet })));
                     }
                 }
@@ -190,7 +187,7 @@ function App() {
         if (selectedPrompt >= 0) {
             const promptsCopy = prompts.filter((_, i) => i !== selectedPrompt);
             setPrompts(promptsCopy);
-            setSelectedPrompt(-1);
+            setSelectedPrompt('');
             setPromptTitle('');
             setPromptContent('');
 
