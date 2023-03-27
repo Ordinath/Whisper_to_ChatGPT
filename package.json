@@ -1,7 +1,9 @@
 {
     "name": "whisper_to_chatgpt",
     "version": "1.2.4",
-    "private": true,
+    "description": "Elevate your ChatGPT experience with Voice-to-Text ChatGPT extension! Seamlessly record your voice and transcribe it using OpenAI's Whisper API - all within your Chrome browser. Just click, record, and transcribe! 🎉",
+    "author": "Ordinath",
+    "license": "MIT",
     "dependencies": {
         "@emotion/react": "^11.10.6",
         "@emotion/styled": "^11.10.6",
