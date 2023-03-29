@@ -1,4 +1,4 @@
-# 🎙️ Voice-to-Text ChatGPT: Transcribe with Whisper API 🚀
+## 🎙️ Voice-to-Text ChatGPT: Transcribe with Whisper API 🚀
 
 Elevate your ChatGPT experience with Voice-to-Text ChatGPT extension! Seamlessly record your voice and transcribe it using OpenAI's Whisper API - all within your Chrome browser. Just click, record, and transcribe! 🎉
 
