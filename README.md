@@ -20,8 +20,8 @@ This extension is now a React application and open-source! 🎉 Check out the re
 To run the extension locally in your Chrome browser, follow these steps:
 
 1. Clone or download the repository from GitHub: https://github.com/Ordinath/Whisper_to_ChatGPT
-2. Install the dependencies by running npm install in the project folder
-3. Run npm run build to build the app for production to the build folder
+2. Install the dependencies by running `npm install` in the project folder
+3. Run `npm run build` to build the app for production to the build folder
 4. Open Google Chrome and navigate to chrome://extensions
 5. Enable "Developer mode" by toggling the switch in the top-right corner
 6. Click on "Load unpacked" button and select the build folder created in step 3
