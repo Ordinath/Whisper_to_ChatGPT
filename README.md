@@ -1,6 +1,6 @@
 ## 🎙️ Voice-to-Text ChatGPT: Transcribe with Whisper API 🚀
 
-Elevate your ChatGPT experience with Voice-to-Text ChatGPT extension! Seamlessly record your voice and transcribe it using OpenAI's Whisper API - all within your Chrome browser. Just click, record, and transcribe! 🎉
+Elevate your ChatGPT experience with [Voice-to-Text ChatGPT chrome extension](https://chrome.google.com/webstore/detail/whisper-to-chatgpt/jdmppbmnffdfhjlddebcelhigiomacfl?hl=ru&authuser=0)! Seamlessly record your voice and transcribe it using OpenAI's Whisper API - all within your Chrome browser. Just click, record, and transcribe! 🎉
 
 This extension is now a React application and open-source! 🎉 Check out the repository on GitHub: https://github.com/Ordinath/Whisper_to_ChatGPT
 
