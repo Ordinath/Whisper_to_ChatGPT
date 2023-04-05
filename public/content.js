@@ -33,10 +33,40 @@ class AudioRecorder {
         this.snippetButtons = [];
     }
 
-    createMicButton() {
+    async listenForKeyboardShortcut() {
+        if (await this.shortcutEnabled()) {
+            const shortcutFirstKey = await retrieveFromStorage('config_shortcut_first_key');
+            const shortcutFirstModifier = await retrieveFromStorage('config_shortcut_first_modifier');
+            const shortcutSecondModifier = await retrieveFromStorage('config_shortcut_second_modifier');
+            // console.log({ shortcutFirstKey, shortcutFirstModifier, shortcutSecondModifier });
+            document.addEventListener('keydown', (event) => {
+                if (event.code === `Key${shortcutFirstKey.toUpperCase()}`) {
+                    if (shortcutFirstModifier && shortcutFirstModifier !== 'none' && !event[shortcutFirstModifier]) return;
+                    if (shortcutSecondModifier && shortcutSecondModifier !== 'none' && !event[shortcutSecondModifier]) return;
+
+                    event.preventDefault();
+
+                    // const firstModLogStr = shortcutFirstModifier && shortcutFirstModifier !== 'none' ? `${shortcutFirstModifier}+` : '';
+                    // const secondModLogStr = shortcutSecondModifier && shortcutSecondModifier !== 'none' ? `${shortcutSecondModifier}+` : '';
+                    // console.log(`shortcut ${firstModLogStr}${secondModLogStr}${shortcutFirstKey} pressed`);
+
+                    // recognize the main textarea button by the textarea having the data-id attribute and the sibling microphone button
+                    const textarea = document.querySelector('textarea[data-id]');
+                    if (textarea) {
+                        const micButton = textarea.parentNode.querySelector('.microphone_button');
+                        if (micButton) {
+                            micButton.click();
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    createMicButton(inputType) { // 'main' : 'secondary'
         this.micButton = document.createElement('button');
         this.micButton.className = `microphone_button ${MICROPHONE_BUTTON_CLASSES}`;
-        this.micButton.style.marginRight = '2.2rem';
+        this.micButton.style.marginRight = inputType === 'main' ? '2.2rem' : '26.5rem';
         this.micButton.innerHTML = SVG_MIC_HTML;
         this.micButton.addEventListener('click', (e) => {
             e.preventDefault();
@@ -108,6 +138,41 @@ class AudioRecorder {
         return snippetsEnabled;
     }
 
+    async shortcutEnabled() {
+        const shortcutEnabled = await retrieveFromStorage('config_enable_shortcut');
+        // initialize the shortcut keys if they are not set (first time user)
+        const shortcutFirstKey = await retrieveFromStorage('config_shortcut_first_key');
+        const shortcutFirstModifier = await retrieveFromStorage('config_shortcut_first_modifier');
+        const shortcutSecondModifier = await retrieveFromStorage('config_shortcut_second_modifier');
+        if (!shortcutFirstKey && !shortcutFirstModifier && !shortcutSecondModifier) {
+            if (navigator.userAgentData.platform.toLowerCase().indexOf('mac') > -1) {
+                await chrome.storage?.sync.set(
+                    {
+                        config_shortcut_first_modifier: 'ctrlKey',
+                        config_shortcut_first_key: 'r',
+                    },
+                    () => {
+                        // console.log('Config stored');
+                    }
+                );
+            } else if (navigator.userAgentData.platform.toLowerCase().indexOf('win') > -1) {
+                await chrome.storage?.sync.set(
+                    {
+                        config_shortcut_first_modifier: 'shiftKey',
+                        config_shortcut_second_modifier: 'altKey',
+                        config_shortcut_first_key: 'r',
+                    },
+                    () => {
+                        // console.log('Config stored');
+                    }
+                );
+            }
+        }
+
+        // console.log('shortcutEnabled', shortcutEnabled);
+        return shortcutEnabled;
+    }
+
     async retrieveToken() {
         return await retrieveFromStorage('openai_token');
     }
@@ -150,7 +215,7 @@ class AudioRecorder {
 
             this.mediaRecorder.addEventListener('stop', async () => {
                 this.setButtonState('loading');
-                console.log('recording stop');
+                // console.log('recording stop');
                 const audioBlob = new Blob(chunks, { type: 'audio/webm' });
 
                 const file = audioBlob;
@@ -161,7 +226,7 @@ class AudioRecorder {
 
                 const storedToken = await this.retrieveToken();
                 const storedPrompt = await this.getSelectedPrompt();
-                console.log('storedPrompt', storedPrompt);
+                // console.log('storedPrompt', storedPrompt);
 
                 const headers = new Headers({
                     Authorization: `Bearer ${storedToken}`,
@@ -256,13 +321,15 @@ async function init() {
     if (TESTING) {
         chrome.storage.sync.clear();
     }
+
     const textareas = document.querySelectorAll('textarea');
 
     textareas.forEach(async (textarea) => {
         const recorder = new AudioRecorder();
+        await recorder.listenForKeyboardShortcut();
         if (!textarea.parentNode.querySelector('.microphone_button')) {
             recorder.textarea = textarea;
-            recorder.createMicButton();
+            recorder.createMicButton('main');
             textarea.parentNode.insertBefore(recorder.micButton, textarea.nextSibling);
             if (await recorder.snippetsEnabled()) {
                 await recorder.createSnippetButtons();
@@ -300,19 +367,48 @@ function downloadFile(file) {
     a.click();
 }
 
+let previousPathname = '';
+// make the mic adding process seamless with a crutch
+let timeout1Id = null;
+let timeout2Id = null;
+let timeout3Id = null;
+
+function addMicButtonToTextareas() {
+    const textareas = document.querySelectorAll('textarea[data-id]');
+
+    textareas.forEach((textarea) => {
+        if (!textarea.parentNode.querySelector('.microphone_button')) {
+            const recorder = new AudioRecorder();
+            recorder.textarea = textarea;
+            recorder.createMicButton('main');
+            textarea.parentNode.insertBefore(recorder.micButton, textarea.nextSibling);
+        }
+    });
+}
+
 function handleMutations(mutations) {
     mutations.forEach((mutation) => {
-        mutation.addedNodes.forEach((node) => {
-            if (node.tagName === 'TEXTAREA') {
-                if (!node.parentNode.querySelector('.microphone_button')) {
-                    const recorder = new AudioRecorder();
-                    recorder.textarea = node;
-                    // console.log('TEXTAREA addedNodes');
-                    recorder.createMicButton();
-                    node.parentNode.insertBefore(recorder.micButton, node.nextSibling);
-                }
-            }
-        });
+        // console.log(mutation);
+        // console.log(window.location.pathname);
+        if (previousPathname !== window.location.pathname) {
+            // console.log('path changed');
+            previousPathname = window.location.pathname;
+
+            addMicButtonToTextareas();
+            // backup crutch
+            if (timeout1Id) clearTimeout(timeout1Id);
+            if (timeout2Id) clearTimeout(timeout2Id);
+            if (timeout3Id) clearTimeout(timeout3Id);
+            timeout1Id = setTimeout(() => {
+                addMicButtonToTextareas();
+            }, 333);
+            timeout2Id = setTimeout(() => {
+                addMicButtonToTextareas();
+            }, 666);
+            timeout3Id = setTimeout(() => {
+                addMicButtonToTextareas();
+            }, 1000);
+        }
     });
 }
 
@@ -321,7 +417,9 @@ async function handleClick(event) {
     if (target.nodeName === 'TEXTAREA' && !target.parentNode.querySelector('.microphone_button')) {
         const recorder = new AudioRecorder();
         recorder.textarea = target;
-        recorder.createMicButton();
+
+        const inputType = target.hasAttribute('data-id') ? 'main' : 'secondary';
+        recorder.createMicButton(inputType);
         target.parentNode.insertBefore(recorder.micButton, target.nextSibling);
         if (await recorder.snippetsEnabled()) {
             await recorder.createSnippetButtons();

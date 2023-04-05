@@ -28,6 +28,14 @@ function App() {
     const [downloadEnabled, setDownloadEnabled] = useState(false);
     const [snippetsEnabled, setSnippetsEnabled] = useState(false);
 
+    // overdone shortcut feature
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split(''); // hardcoded for now, we can adjust later if alphabet changes
+    const [shortcutEnabled, setShortcutEnabled] = useState(false);
+    const [shortcutFirstKey, setShortcutFirstKey] = useState('none');
+    // const [shortcutSecondKey, setShortcutSecondKey] = useState('none');
+    const [shortcutFirstModifier, setShortcutFirstModifier] = useState('none');
+    const [shortcutSecondModifier, setShortcutSecondModifier] = useState('none');
+
     const [promptTitle, setPromptTitle] = useState('');
     const [promptContent, setPromptContent] = useState('');
 
@@ -44,6 +52,11 @@ function App() {
                     'config_enable_download',
                     'config_enable_snippets',
                     'snippets',
+                    'config_enable_shortcut',
+                    'config_shortcut_first_key',
+                    // 'config_shortcut_second_key',
+                    'config_shortcut_first_modifier',
+                    'config_shortcut_second_modifier',
                 ],
                 async (result) => {
                     console.log('Config retrieved:', { ...result, openai_token: result.openai_token ? '***' : '' });
@@ -95,6 +108,39 @@ function App() {
                         setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
                     }
 
+                    // shortcuts config on first launch 
+                    if (!result.config_shortcut_first_key && !result.config_shortcut_first_modifier && !result.config_shortcut_second_modifier) {
+                        // we set default for windows and mac separately
+                        if ((navigator.userAgentData.platform).toLowerCase().indexOf('mac') > -1) {
+                            setShortcutFirstModifier('ctrlKey');
+                            setShortcutFirstKey('r');
+                            await chrome.storage?.sync.set(
+                                {
+                                    config_shortcut_first_modifier: 'ctrlKey',
+                                    config_shortcut_first_key: 'r',
+                                },
+                                () => {
+                                    // console.log('Config stored');
+                                }
+                            );
+
+                        } else if ((navigator.userAgentData.platform).toLowerCase().indexOf('win') > -1) {
+                            setShortcutFirstModifier('shiftKey');
+                            setShortcutSecondModifier('altKey');
+                            setShortcutFirstKey('r');
+                            await chrome.storage?.sync.set(
+                                {
+                                    config_shortcut_first_modifier: 'shiftKey',
+                                    config_shortcut_second_modifier: 'altKey',
+                                    config_shortcut_first_key: 'r',
+                                },
+                                () => {
+                                    // console.log('Config stored');
+                                }
+                            );
+                        }
+                    }
+
                     if (result.config_enable_translation) {
                         setTranslationEnabled(result.config_enable_translation);
                     }
@@ -106,6 +152,21 @@ function App() {
                     }
                     if (result.snippets) {
                         setSnippetFields(result.snippets.map((snippet, index) => ({ id: index, value: snippet })));
+                    }
+                    if (result.config_enable_shortcut) {
+                        setShortcutEnabled(result.config_enable_shortcut);
+                    }
+                    if (result.config_shortcut_first_key) {
+                        setShortcutFirstKey(result.config_shortcut_first_key);
+                    }
+                    // if (result.config_shortcut_second_key) {
+                    //     setShortcutSecondKey(result.config_shortcut_second_key);
+                    // }
+                    if (result.config_shortcut_first_modifier) {
+                        setShortcutFirstModifier(result.config_shortcut_first_modifier);
+                    }
+                    if (result.config_shortcut_second_modifier) {
+                        setShortcutSecondModifier(result.config_shortcut_second_modifier);
                     }
                 }
             );
@@ -221,6 +282,13 @@ function App() {
         });
     };
 
+    const handleToggleShortcut = (event) => {
+        setShortcutEnabled(event.target.checked);
+        chrome.storage?.sync.set({ config_enable_shortcut: event.target.checked }, () => {
+            // console.log('Config stored:', { config_enable_translation: event.target.checked });
+        });
+    };
+
     const handleToggleDownload = (event) => {
         setDownloadEnabled(event.target.checked);
         chrome.storage?.sync.set({ config_enable_download: event.target.checked }, () => {
@@ -241,6 +309,33 @@ function App() {
             // console.log('Config stored:', { openai_token: event.target.value });
         });
     };
+
+    const handleShortcutFirstModifierChange = (event) => {
+        setShortcutFirstModifier(event.target.value);
+        chrome.storage?.sync.set({ config_shortcut_first_modifier: event.target.value }, () => {
+            // console.log('Config stored:', { config_shortcut_first_modifier: event.target.value });
+        });
+    };
+
+    const handleShortcutSecondModifierChange = (event) => {
+        setShortcutSecondModifier(event.target.value);
+        chrome.storage?.sync.set({ config_shortcut_second_modifier: event.target.value }, () => {
+            // console.log('Config stored:', { config_shortcut_second_modifier: event.target.value });
+        });
+    };
+    const handleShortcutFirstKeyChange = (event) => {
+        setShortcutFirstKey(event.target.value);
+        chrome.storage?.sync.set({ config_shortcut_first_key: event.target.value }, () => {
+            // console.log('Config stored:', { config_shortcut_first_key: event.target.value });
+        });
+    };
+
+    // const handleShortcutSecondKeyChange = (event) => {
+    //     setShortcutSecondKey(event.target.value);
+    //     chrome.storage?.sync.set({ config_shortcut_second_key: event.target.value }, () => {
+    //         // console.log('Config stored:', { config_shortcut_second_key: event.target.value });
+    //     });
+    // };
 
     return (
         <>
@@ -323,6 +418,70 @@ function App() {
                             Config:
                         </Typography>
                     </Box>
+                    <Box width="100%">
+                        <FormControlLabel control={<Switch checked={shortcutEnabled} onChange={handleToggleShortcut} />} label="Enable Microphone Toggle Shortcut" />
+                        <FormHelperText>Requires page refresh on an any change.</FormHelperText>
+                    </Box>
+                    {shortcutEnabled && (
+                        <>
+                            <Box width="35%">
+                                <FormControl fullWidth>
+                                    <InputLabel id="select-modifier1-label">Modifier 1</InputLabel>
+                                    <Select
+                                        label="Modifier 1"
+                                        labelId="select-modifier1-label"
+                                        value={shortcutFirstModifier}
+                                        onChange={handleShortcutFirstModifierChange}
+                                        size="small"
+                                    >
+                                        <MenuItem value="none">None</MenuItem>
+                                        <MenuItem value="ctrlKey">Ctrl</MenuItem>
+                                        <MenuItem value="shiftKey">Shift</MenuItem>
+                                        <MenuItem value="metaKey">Metakey (⊞ on Windows / ⌘ on Mac)</MenuItem>
+                                        <MenuItem value="altKey">Altkey (alt on Windows / ⌥ on Mac)</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                            <Box width="35%">
+                                <FormControl fullWidth>
+                                    <InputLabel id="select-modifier2-label">Modifier 2</InputLabel>
+                                    <Select
+                                        label="Modifier 2"
+                                        labelId="select-modifier2-label"
+                                        value={shortcutSecondModifier}
+                                        onChange={handleShortcutSecondModifierChange}
+                                        size="small"
+                                    >
+                                        <MenuItem value="none">None</MenuItem>
+                                        <MenuItem value="ctrlKey">Ctrl</MenuItem>
+                                        <MenuItem value="shiftKey">Shift</MenuItem>
+                                        <MenuItem value="metaKey">Metakey (⊞ on Windows / ⌘ on Mac)</MenuItem>
+                                        <MenuItem value="altKey">Altkey (alt on Windows / ⌥ on Mac)</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                            <Box width="15%" flexGrow={1}>
+                                <FormControl fullWidth>
+                                    <InputLabel id="select-key1-label">Key</InputLabel>
+                                    <Select
+                                        required={true}
+                                        label="Key"
+                                        labelId="select-key1-label"
+                                        value={shortcutFirstKey}
+                                        onChange={handleShortcutFirstKeyChange}
+                                        size="small"
+                                    >
+                                        {/* <MenuItem value="none">None</MenuItem> */}
+                                        {alphabet.map((letter) => (
+                                            <MenuItem key={letter} value={letter}>
+                                                {letter.toUpperCase()}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            </Box>
+                        </>
+                    )}
                     <Box width="100%">
                         <FormControlLabel control={<Switch checked={translationEnabled} onChange={handleToggleTranslation} />} label="Enable Translation" />
                         <FormHelperText>Translate any input language to English</FormHelperText>
