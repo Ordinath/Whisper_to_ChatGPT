@@ -7,6 +7,7 @@ This extension is now a React application and open-source! 🎉 Check out the re
 ## ✨ Features
 
 - 🎤 Record your voice and transcribe it using the powerful Whisper API
+- ⚡ Configurable shortcut button to quickly activate the microphone
 - 🌐 Use the extension with main inputs on chat.openai.com and edit-inputs
 - 🔧 Customize the prompt for better API voice recognition results
 - 👁️ Clean and user-friendly interface with an eye-catching mic button
