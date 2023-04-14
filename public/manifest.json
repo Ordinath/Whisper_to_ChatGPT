@@ -11,7 +11,7 @@
     "description": "Prompt with your voice to ChatGPT in your Chrome browser using Whisper API with a button click.",
     "content_scripts": [
         {
-            "matches": ["https://chat.openai.com/chat*"],
+            "matches": ["https://chat.openai.com/c*"],
             "js": ["content.js"],
             "css": ["content.css"],
             "run_at": "document_idle",
