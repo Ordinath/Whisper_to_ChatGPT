@@ -1,7 +1,7 @@
 {
     "manifest_version": 3,
     "name": "Whisper to ChatGPT",
-    "version": "1.2.6",
+    "version": "1.2.7",
     "icons": {
         "16": "icon16.png",
         "32": "icon32.png",
@@ -11,7 +11,7 @@
     "description": "Prompt with your voice to ChatGPT in your Chrome browser using Whisper API with a button click.",
     "content_scripts": [
         {
-            "matches": ["https://chat.openai.com/c*"],
+            "matches": ["https://chat.openai.com/*"],
             "js": ["content.js"],
             "css": ["content.css"],
             "run_at": "document_idle",
