@@ -11,9 +11,16 @@
     "description": "Prompt with your voice to ChatGPT in your Chrome browser using Whisper API with a button click.",
     "content_scripts": [
         {
-            "matches": ["https://chat.openai.com/*"],
-            "js": ["content.js"],
-            "css": ["content.css"],
+            "matches": [
+                "https://chat.openai.com/*",
+                "https://chatgpt.com/*"
+            ],
+            "js": [
+                "content.js"
+            ],
+            "css": [
+                "content.css"
+            ],
             "run_at": "document_idle",
             "all_frames": false
         }
@@ -25,5 +32,7 @@
         "default_icon": "icon128.png",
         "default_popup": "index.html"
     },
-    "permissions": ["storage"]
+    "permissions": [
+        "storage"
+    ]
 }

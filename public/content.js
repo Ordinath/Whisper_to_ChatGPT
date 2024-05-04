@@ -1,17 +1,21 @@
 /* global chrome */
-const SVG_MIC_HTML =
-    '<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 512 512" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 mr-1" height="1.2em" width="1.2em" style="margin-left:0.2em;" xmlns="http://www.w3.org/2000/svg"> <line x1="192" y1="448" x2="320" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></line> <path d="M384,208v32c0,70.4-57.6,128-128,128h0c-70.4,0-128-57.6-128-128V208" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></path> <line x1="256" y1="368" x2="256" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></line> <path d="M256,320a78.83,78.83,0,0,1-56.55-24.1A80.89,80.89,0,0,1,176,239V128a79.69,79.69,0,0,1,80-80c44.86,0,80,35.14,80,80V239C336,283.66,300.11,320,256,320Z" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px"></path></svg>';
-const SVG_MIC_SPINNING_HTML =
-    '<svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 512 512" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 mr-1" height="1.2em" width="1.2em" style="margin-left:0.2em;" xmlns="http://www.w3.org/2000/svg"><style>.spinnerMic{transform-origin:center;animation:spinner_svv2 .75s infinite linear}@keyframes spinner_svv2{100%{transform:rotate(360deg)}}</style><line x1="192" y1="448" x2="320" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px" class="spinnerMic"></line> <path d="M384,208v32c0,70.4-57.6,128-128,128h0c-70.4,0-128-57.6-128-128V208" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px" class="spinnerMic"></path> <line x1="256" y1="368" x2="256" y2="448" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px" class="spinnerMic"></line> <path d="M256,320a78.83,78.83,0,0,1-56.55-24.1A80.89,80.89,0,0,1,176,239V128a79.69,79.69,0,0,1,80-80c44.86,0,80,35.14,80,80V239C336,283.66,300.11,320,256,320Z" style="fill:none;stroke:#8e8ea0;stroke-linecap:square;stroke-miterlimit:10;stroke-width:48px" class="spinnerMic"></path></svg>';
+const SVG_MIC_HTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+    </svg>`;
+const SVG_MIC_SPINNING_HTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+        <style>
+        .spinnerMic { transform-origin: center; animation: spinner_svv2 0.75s infinite linear; }
+        @keyframes spinner_svv2 { 100% { transform: rotate(360deg); } }
+        </style>
+        <path class="spinnerMic" stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 1 1 6 0v8.25a3 3 0 0 1-3 3Z" />
+    </svg>`;
 const SVG_SPINNER_HTML =
-    '<div style="position:relative;width:24px;height:16px;"> <svg viewBox="0 0 24 24" style="position:absolute;top:0;left:0;width:100%;height:100%;"> <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="15 85" transform="rotate(0)"> <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 12 12" to="360 12 12" dur="0.75s" repeatCount="indefinite"/> </circle> </svg></div>';
-// const SVG_MIC_HTML = "<svg>{irrelevant}</svg>";
-// const SVG_MIC_SPINNING_HTML = "<svg>{irrelevant}</svg>";
-// const SVG_SPINNER_HTML = "<svg>{irrelevant}</svg>";
+    '<svg viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6"> <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" stroke-dasharray="15 85" transform="rotate(0)"> <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 12 12" to="360 12 12" dur="0.75s" repeatCount="indefinite"/> </circle> </svg>';
+
 const TRANSCRIPTION_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const TRANSLATION_URL = 'https://api.openai.com/v1/audio/translations';
 const MICROPHONE_BUTTON_CLASSES =
-    'absolute p-1 rounded-md text-gray-500 bottom-1.5 right-1 md:bottom-2.5 md:right-2 hover:bg-gray-100 dark:hover:text-gray-400 dark:hover:bg-gray-900';
+    'absolute p-0.5 rounded-md bottom-1.5 right-2 md:bottom-3 md:right-3 hover:bg-gray-100 text-gray-500 dark:hover:text-gray-400 dark:hover:bg-gray-900';
 
 const TESTING = false;
 
@@ -63,7 +67,8 @@ class AudioRecorder {
         }
     }
 
-    createMicButton(inputType) { // 'main' : 'secondary'
+    createMicButton(inputType) {
+        // 'main' : 'secondary'
         this.micButton = document.createElement('button');
         this.micButton.className = `microphone_button ${MICROPHONE_BUTTON_CLASSES}`;
         this.micButton.style.marginRight = inputType === 'main' ? '2.2rem' : '26.5rem';
