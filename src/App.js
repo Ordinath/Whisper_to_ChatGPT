@@ -490,11 +490,11 @@ function App() {
                         <FormControlLabel control={<Switch checked={downloadEnabled} onChange={handleToggleDownload} />} label="Enable File Download" />
                         <FormHelperText>Download sound file with recording</FormHelperText>
                     </Box>
-                    <Box width="100%">
+                    {/* <Box width="100%">
                         <FormControlLabel control={<Switch checked={snippetsEnabled} onChange={handleToggleSnippets} />} label="Enable Snippets (Beta)" />
                         <FormHelperText>Requires page refresh on toggle. Only tested on desktop version.</FormHelperText>
-                    </Box>
-                    {snippetsEnabled && (
+                    </Box> */}
+                    {/* {snippetsEnabled && (
                         <>
                             <Box width="100%">
                                 <Typography variant="subtitle1">Predefined Snippets:</Typography>
@@ -525,7 +525,7 @@ function App() {
                                 </Button>
                             </Box>
                         </>
-                    )}
+                    )} */}
                 </Box>
             </ThemeProvider>
         </>
