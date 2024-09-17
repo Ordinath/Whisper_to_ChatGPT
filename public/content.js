@@ -14,9 +14,9 @@ const SVG_SPINNER_HTML =
 
 const TRANSCRIPTION_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const TRANSLATION_URL = 'https://api.openai.com/v1/audio/translations';
-const MAIN_MICROPHONE_BUTTON_CLASSES = 
+const MAIN_MICROPHONE_BUTTON_CLASSES =
     'mb-1 mr-1 flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
-const SECONDARY_MICROPHONE_BUTTON_CLASSES = 
+const SECONDARY_MICROPHONE_BUTTON_CLASSES =
     'flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
 
 const TESTING = false;
@@ -46,13 +46,14 @@ class AudioRecorder {
             const shortcutSecondModifier = await retrieveFromStorage('config_shortcut_second_modifier');
             document.addEventListener('keydown', (event) => {
                 if (event.code === `Key${shortcutFirstKey.toUpperCase()}`) {
+                    console.log(event);
                     if (shortcutFirstModifier && shortcutFirstModifier !== 'none' && !event[shortcutFirstModifier]) return;
                     if (shortcutSecondModifier && shortcutSecondModifier !== 'none' && !event[shortcutSecondModifier]) return;
 
                     event.preventDefault();
-                    const textarea = document.querySelector('textarea[data-id]');
-                    if (textarea) {
-                        const micButton = textarea.parentNode.parentNode.querySelector('.microphone_button');
+                    const promptTextarea = document.querySelector('#prompt-textarea');
+                    if (promptTextarea) {
+                        const micButton = promptTextarea.closest('.flex.items-end.gap-1\\.5.md\\:gap-2').querySelector('.microphone_button');
                         if (micButton) {
                             micButton.click();
                         }
@@ -61,7 +62,6 @@ class AudioRecorder {
             });
         }
     }
-
     createMicButton(inputType) {
         this.micButton = document.createElement('button');
         if (inputType === 'main') {
@@ -75,30 +75,6 @@ class AudioRecorder {
             this.toggleRecording();
         });
     }
-
-    // async createSnippetButtons() {
-    //     const snippets = await retrieveFromStorage('snippets');
-    //     if (!snippets) return;
-
-    //     const numberOfRows = Math.ceil(snippets.length / 9);
-    //     snippets.forEach((snippet, index) => {
-    //         if (!snippet) return;
-    //         const button = document.createElement('button');
-    //         button.textContent = index + 1;
-    //         button.className = `snippet_button ${MAIN_MICROPHONE_BUTTON_CLASSES}`;
-
-    //         const y = -0.6 - numberOfRows * 2.2 + Math.floor(index / 9) * 2.2;
-    //         const x = -45.7 + (index % 9) * 2;
-    //         button.style.transform = `translate(${x}rem, ${y}rem)`;
-
-    //         button.addEventListener('click', (e) => {
-    //             e.preventDefault();
-    //             this.insertTextResult(snippet);
-    //         });
-    //         this.textarea.parentNode.parentNode.insertBefore(button, this.textarea.nextSibling);
-    //         this.snippetButtons.push({ button, x, y, initialY: y });
-    //     });
-    // }
 
     updateButtonGridPosition() {
         const textareaRows = this.textarea.clientHeight / 24;
@@ -262,13 +238,52 @@ class AudioRecorder {
     }
 
     insertTextResult(resultText) {
-        const startPos = this.textarea.selectionStart;
-        const endPos = this.textarea.selectionEnd;
-        const newText = this.textarea.value.substring(0, startPos) + resultText + this.textarea.value.substring(endPos);
-        this.textarea.value = newText;
-        this.textarea.selectionStart = startPos + resultText.length;
-        this.textarea.selectionEnd = this.textarea.selectionStart;
-        this.textarea.dispatchEvent(new Event('input', { bubbles: true }));
+        const inputElement = this.textarea;
+        
+        // Check if the input element is focused
+        const isInputFocused = document.activeElement === inputElement;
+        
+        if (isInputFocused) {
+            // If focused, insert at cursor position
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            
+            // Create a new text node with the result text
+            const textNode = document.createTextNode(resultText);
+            
+            // Insert the new text node at the current cursor position
+            range.insertNode(textNode);
+            
+            // Move the cursor to the end of the inserted text
+            range.setStartAfter(textNode);
+            range.setEndAfter(textNode);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            // If not focused, append to the end
+            const lastParagraph = inputElement.querySelector('p:last-child') || inputElement;
+            
+            // Create a new text node with the result text
+            const textNode = document.createTextNode(resultText);
+            
+            // Append the new text node to the last paragraph
+            lastParagraph.appendChild(textNode);
+            
+            // Move the cursor to the end of the appended text
+            const range = document.createRange();
+            range.selectNodeContents(lastParagraph);
+            range.collapse(false);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+        
+        // Trigger an input event to notify any listeners
+        const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+        inputElement.dispatchEvent(inputEvent);
+
+        // Set focus to the input element
+        inputElement.focus();
     }
 
     setButtonState(state) {
@@ -293,27 +308,45 @@ class AudioRecorder {
     }
 }
 
-function addMicrophoneButton(textarea, inputType) {
-    const recorder = new AudioRecorder();
-    recorder.textarea = textarea;
-    recorder.createMicButton(inputType);
-
-    if (inputType === 'main') {
-        const parentElement = textarea.parentNode.parentNode;
-        parentElement.classList.remove('gap-1.5', 'md:gap-3.5');
-        parentElement.classList.add('gap-1', 'md:gap-2.5');
-        parentElement.insertBefore(recorder.micButton, textarea.parentNode.nextSibling);
-    } else if (inputType === 'secondary') {
-        const siblingDiv = textarea.parentNode.querySelector('div.flex.justify-end.gap-2');
-        if (siblingDiv) {
-            siblingDiv.classList.remove('gap-2');
-            siblingDiv.classList.add('gap-1');
-            siblingDiv.insertBefore(recorder.micButton, siblingDiv.firstChild);
-        }
+function addMicrophoneButton(inputElement, inputType) {
+    // Check if a microphone button already exists in the parent container
+    const parentElement = inputElement.closest('.flex.items-end.gap-1\\.5.md\\:gap-2');
+    if (parentElement && parentElement.querySelector('.microphone_button')) {
+        return; // Button already exists, don't add another one
     }
 
-    // recorder.createSnippetButtons();
-    recorder.observeTextareaResize();
+    const recorder = new AudioRecorder();
+    recorder.textarea = inputElement;
+    recorder.createMicButton(inputType);
+
+    if (parentElement) {
+        const sendButton = parentElement.querySelector('button[data-testid="send-button"]');
+        if (sendButton) {
+            parentElement.insertBefore(recorder.micButton, sendButton);
+        }
+    }
+}
+
+function observeDOM() {
+    const targetNode = document.body;
+    const config = { childList: true, subtree: true };
+
+    const callback = function (mutationsList, observer) {
+        for (let mutation of mutationsList) {
+            if (mutation.type === 'childList') {
+                const inputElement = document.querySelector('#prompt-textarea');
+                if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.md\\:gap-2').querySelector('.microphone_button')) {
+                    addMicrophoneButton(inputElement, 'main');
+                    const recorder = new AudioRecorder();
+                    recorder.textarea = inputElement;
+                    recorder.listenForKeyboardShortcut();
+                }
+            }
+        }
+    };
+
+    const observer = new MutationObserver(callback);
+    observer.observe(targetNode, config);
 }
 
 async function init() {
@@ -321,24 +354,7 @@ async function init() {
         chrome.storage.sync.clear();
     }
 
-    const textareas = document.querySelectorAll('textarea');
-
-    textareas.forEach(async (textarea) => {
-        await new AudioRecorder().listenForKeyboardShortcut();
-        const inputType = textarea.hasAttribute('data-id') ? 'main' : 'secondary';
-        if (inputType === 'main' && !textarea.parentNode.parentNode.querySelector('.microphone_button')) {
-            addMicrophoneButton(textarea, inputType);
-        } else if (inputType === 'secondary' && !textarea.parentNode.querySelector('.microphone_button')) {
-            addMicrophoneButton(textarea, inputType);
-        }
-    });
-
-    // Add microphone button to textareas added later
-    const observer = new MutationObserver(handleMutations);
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-    });
+    observeDOM();
 
     document.addEventListener('click', handleClick);
 }
@@ -359,47 +375,6 @@ function downloadFile(file) {
     a.href = URL.createObjectURL(file);
     a.download = fileName;
     a.click();
-}
-
-let previousPathname = '';
-// make the mic adding process seamless with a crutch
-let timeout1Id = null;
-let timeout2Id = null;
-let timeout3Id = null;
-
-function addMicButtonToTextareas() {
-    const textareas = document.querySelectorAll('textarea[data-id]');
-
-    textareas.forEach((textarea) => {
-        const inputType = textarea.hasAttribute('data-id') ? 'main' : 'secondary';
-        if (inputType === 'main' && !textarea.parentNode.parentNode.querySelector('.microphone_button')) {
-            addMicrophoneButton(textarea, inputType);
-        } else if (inputType === 'secondary' && !textarea.parentNode.querySelector('.microphone_button')) {
-            addMicrophoneButton(textarea, inputType);
-        }
-    });
-}
-
-function handleMutations(mutations) {
-    mutations.forEach((mutation) => {
-        if (previousPathname !== window.location.pathname) {
-            previousPathname = window.location.pathname;
-            addMicButtonToTextareas();
-            // backup crutch
-            if (timeout1Id) clearTimeout(timeout1Id);
-            if (timeout2Id) clearTimeout(timeout2Id);
-            if (timeout3Id) clearTimeout(timeout3Id);
-            timeout1Id = setTimeout(() => {
-                addMicButtonToTextareas();
-            }, 333);
-            timeout2Id = setTimeout(() => {
-                addMicButtonToTextareas();
-            }, 666);
-            timeout3Id = setTimeout(() => {
-                addMicButtonToTextareas();
-            }, 1000);
-        }
-    });
 }
 
 async function handleClick(event) {
