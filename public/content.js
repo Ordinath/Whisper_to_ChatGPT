@@ -46,7 +46,7 @@ class AudioRecorder {
             const shortcutSecondModifier = await retrieveFromStorage('config_shortcut_second_modifier');
             document.addEventListener('keydown', (event) => {
                 if (event.code === `Key${shortcutFirstKey.toUpperCase()}`) {
-                    console.log(event);
+                    // console.log(event);
                     if (shortcutFirstModifier && shortcutFirstModifier !== 'none' && !event[shortcutFirstModifier]) return;
                     if (shortcutSecondModifier && shortcutSecondModifier !== 'none' && !event[shortcutSecondModifier]) return;
 
@@ -239,21 +239,21 @@ class AudioRecorder {
 
     insertTextResult(resultText) {
         const inputElement = this.textarea;
-        
+
         // Check if the input element is focused
         const isInputFocused = document.activeElement === inputElement;
-        
+
         if (isInputFocused) {
             // If focused, insert at cursor position
             const selection = window.getSelection();
             const range = selection.getRangeAt(0);
-            
+
             // Create a new text node with the result text
             const textNode = document.createTextNode(resultText);
-            
+
             // Insert the new text node at the current cursor position
             range.insertNode(textNode);
-            
+
             // Move the cursor to the end of the inserted text
             range.setStartAfter(textNode);
             range.setEndAfter(textNode);
@@ -262,13 +262,13 @@ class AudioRecorder {
         } else {
             // If not focused, append to the end
             const lastParagraph = inputElement.querySelector('p:last-child') || inputElement;
-            
+
             // Create a new text node with the result text
             const textNode = document.createTextNode(resultText);
-            
+
             // Append the new text node to the last paragraph
             lastParagraph.appendChild(textNode);
-            
+
             // Move the cursor to the end of the appended text
             const range = document.createRange();
             range.selectNodeContents(lastParagraph);
@@ -277,7 +277,7 @@ class AudioRecorder {
             selection.removeAllRanges();
             selection.addRange(range);
         }
-        
+
         // Trigger an input event to notify any listeners
         const inputEvent = new Event('input', { bubbles: true, cancelable: true });
         inputElement.dispatchEvent(inputEvent);
@@ -310,7 +310,8 @@ class AudioRecorder {
 
 function addMicrophoneButton(inputElement, inputType) {
     // Check if a microphone button already exists in the parent container
-    const parentElement = inputElement.closest('.flex.items-end.gap-1\\.5.md\\:gap-2');
+    const parentElement = inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
+    // console.log(parentElement);
     if (parentElement && parentElement.querySelector('.microphone_button')) {
         return; // Button already exists, don't add another one
     }
@@ -319,11 +320,13 @@ function addMicrophoneButton(inputElement, inputType) {
     recorder.textarea = inputElement;
     recorder.createMicButton(inputType);
 
-    if (parentElement) {
-        const sendButton = parentElement.querySelector('button[data-testid="send-button"]');
-        if (sendButton) {
-            parentElement.insertBefore(recorder.micButton, sendButton);
-        }
+    const sendButton = parentElement.querySelector('button[data-testid="send-button"]');
+
+    // if send button parent node have class of w-10 then insert two levels up
+    if (sendButton.parentNode.classList.contains('w-10')) {
+        sendButton.parentNode.parentNode.insertBefore(recorder.micButton, sendButton.parentNode.parentNode.childNodes[1]);
+    } else {
+        sendButton.parentNode.insertBefore(recorder.micButton, sendButton);
     }
 }
 
@@ -335,7 +338,7 @@ function observeDOM() {
         for (let mutation of mutationsList) {
             if (mutation.type === 'childList') {
                 const inputElement = document.querySelector('#prompt-textarea');
-                if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.md\\:gap-2').querySelector('.microphone_button')) {
+                if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2').querySelector('.microphone_button')) {
                     addMicrophoneButton(inputElement, 'main');
                     const recorder = new AudioRecorder();
                     recorder.textarea = inputElement;
