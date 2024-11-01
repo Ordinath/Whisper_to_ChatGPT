@@ -319,53 +319,54 @@ class AudioRecorder {
     }
 }
 
+// First, let's create a singleton recorder instance
+let globalRecorder = null;
+
 function addMicrophoneButton(inputElement, inputType) {
     try {
         // First, try the PRO version layout
         let proParentElement = inputElement.closest('.group.relative.flex.w-full.items-center');
         let nonProParentElement = inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
-        // let sendButtonContainer;
+
+        // Create or reuse the global recorder
+        if (!globalRecorder) {
+            globalRecorder = new AudioRecorder();
+            globalRecorder.textarea = inputElement;
+            globalRecorder.listenForKeyboardShortcut();
+        } else {
+            globalRecorder.textarea = inputElement;
+        }
 
         if (proParentElement && !nonProParentElement) {
             // PRO version layout
             if (proParentElement?.querySelector('.microphone_button')) {
-                return; // Button already exists
+                return;
             }
             const sendButtonContainer = proParentElement?.querySelector('div.min-w-8');
 
-            const recorder = new AudioRecorder();
-            recorder.textarea = inputElement;
-            recorder.createMicButton(inputType, 'PRO');
+            globalRecorder.createMicButton(inputType, 'PRO');
 
             if (sendButtonContainer) {
-                // Create a wrapper div to match the structure
                 const wrapperDiv = document.createElement('div');
                 wrapperDiv.className = 'min-w-8';
-                wrapperDiv.appendChild(recorder.micButton);
+                wrapperDiv.appendChild(globalRecorder.micButton);
 
                 sendButtonContainer.parentNode.className = '-mr-0.5 flex gap-2';
-                // Insert the wrapper before the send button container
                 sendButtonContainer.parentNode.insertBefore(wrapperDiv, sendButtonContainer);
             }
         } else if (nonProParentElement && proParentElement) {
-            // Try the non-PRO version layout
             if (nonProParentElement?.querySelector('.microphone_button')) {
-                return; // Button already exists, don't add another one
+                return;
             }
 
-            const recorder = new AudioRecorder();
-            recorder.textarea = inputElement;
-            recorder.createMicButton(inputType, 'NON-PRO');
+            globalRecorder.createMicButton(inputType, 'NON-PRO');
 
-            // Find the send button container
             const sendButtonContainer = nonProParentElement?.querySelector('div.min-w-8');
 
             if (sendButtonContainer) {
-                // Insert the microphone button before the send button container
-                sendButtonContainer.parentNode.insertBefore(recorder.micButton, sendButtonContainer);
+                sendButtonContainer.parentNode.insertBefore(globalRecorder.micButton, sendButtonContainer);
             } else {
-                // Fallback: insert before the last child of the parent element
-                nonProParentElement.insertBefore(recorder.micButton, nonProParentElement.lastElementChild);
+                nonProParentElement.insertBefore(globalRecorder.micButton, nonProParentElement.lastElementChild);
             }
         }
     } catch (error) {
@@ -383,28 +384,19 @@ function observeDOM() {
                 if (mutation.type === 'childList') {
                     const inputElement = document.querySelector('#prompt-textarea');
                     if (inputElement) {
-                        // Try both layouts
                         const proParent = inputElement.closest('.group.relative.flex.w-full.items-center');
                         const nonProParent = inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
 
-                        console.log('WHISPER TO CHATGPT ________________________', proParent, nonProParent);
                         if (proParent && !nonProParent) {
                             const proMicButton = proParent.querySelector('.microphone_button');
                             if (inputElement && !proMicButton) {
                                 addMicrophoneButton(inputElement, 'main');
-                                const recorder = new AudioRecorder();
-                                recorder.textarea = inputElement;
-                                recorder.listenForKeyboardShortcut();
                             }
                         }
                         // the layout for non pro has both containers
                         if (nonProParent && proParent) {
-                            // const nonProMicButton = nonProParent.querySelector('.microphone_button');
                             if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2').querySelector('.microphone_button')) {
                                 addMicrophoneButton(inputElement, 'main');
-                                const recorder = new AudioRecorder();
-                                recorder.textarea = inputElement;
-                                recorder.listenForKeyboardShortcut();
                             }
                         }
                     }
