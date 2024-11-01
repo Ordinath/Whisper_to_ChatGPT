@@ -21,6 +21,10 @@ const SECONDARY_MICROPHONE_BUTTON_CLASSES =
 
 const TESTING = false;
 
+function logError(message, error) {
+    console.error(`[Whisper to ChatGPT] ${message}`, error);
+}
+
 async function retrieveFromStorage(key) {
     return new Promise((resolve) => {
         chrome.storage.sync.get(key, function (result) {
@@ -309,57 +313,72 @@ class AudioRecorder {
 }
 
 function addMicrophoneButton(inputElement, inputType) {
-    // Check if a microphone button already exists in the parent container
-    const parentElement = inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
-    // console.log(parentElement);
-    if (parentElement && parentElement.querySelector('.microphone_button')) {
-        return; // Button already exists, don't add another one
-    }
+    try {
+        // Check if a microphone button already exists in the parent container
+        const parentElement = inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
+        if (parentElement && parentElement.querySelector('.microphone_button')) {
+            return; // Button already exists, don't add another one
+        }
 
-    const recorder = new AudioRecorder();
-    recorder.textarea = inputElement;
-    recorder.createMicButton(inputType);
+        const recorder = new AudioRecorder();
+        recorder.textarea = inputElement;
+        recorder.createMicButton(inputType);
 
-    const sendButton = parentElement.querySelector('button[data-testid="send-button"]');
+        // Find the send button container
+        const sendButtonContainer = parentElement.querySelector('div.min-w-8');
 
-    // if send button parent node have class of w-10 then insert two levels up
-    if (sendButton.parentNode.classList.contains('w-10')) {
-        sendButton.parentNode.parentNode.insertBefore(recorder.micButton, sendButton.parentNode.parentNode.childNodes[1]);
-    } else {
-        sendButton.parentNode.insertBefore(recorder.micButton, sendButton);
+        if (sendButtonContainer) {
+            // Insert the microphone button before the send button container
+            sendButtonContainer.parentNode.insertBefore(recorder.micButton, sendButtonContainer);
+        } else {
+            // Fallback: insert before the last child of the parent element
+            parentElement.insertBefore(recorder.micButton, parentElement.lastElementChild);
+        }
+    } catch (error) {
+        logError('Failed to add microphone button', error);
     }
 }
 
 function observeDOM() {
-    const targetNode = document.body;
-    const config = { childList: true, subtree: true };
+    try {
+        const targetNode = document.body;
+        const config = { childList: true, subtree: true };
 
-    const callback = function (mutationsList, observer) {
-        for (let mutation of mutationsList) {
-            if (mutation.type === 'childList') {
-                const inputElement = document.querySelector('#prompt-textarea');
-                if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2').querySelector('.microphone_button')) {
-                    addMicrophoneButton(inputElement, 'main');
-                    const recorder = new AudioRecorder();
-                    recorder.textarea = inputElement;
-                    recorder.listenForKeyboardShortcut();
+        const callback = function (mutationsList, observer) {
+            for (let mutation of mutationsList) {
+                if (mutation.type === 'childList') {
+                    const inputElement = document.querySelector('#prompt-textarea');
+                    if (inputElement && !inputElement.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2').querySelector('.microphone_button')) {
+                        addMicrophoneButton(inputElement, 'main');
+                        const recorder = new AudioRecorder();
+                        recorder.textarea = inputElement;
+                        recorder.listenForKeyboardShortcut();
+                    }
                 }
             }
-        }
-    };
+        };
 
-    const observer = new MutationObserver(callback);
-    observer.observe(targetNode, config);
+        const observer = new MutationObserver(callback);
+        observer.observe(targetNode, config);
+    } catch (error) {
+        logError('Failed to observe DOM', error);
+    }
 }
 
 async function init() {
-    if (TESTING) {
-        chrome.storage.sync.clear();
+    try {
+        if (TESTING) {
+            chrome.storage.sync.clear();
+        }
+
+        observeDOM();
+        document.addEventListener('click', handleClick);
+
+        // Add a log to confirm initialization
+        console.log('[Whisper to ChatGPT] Extension initialized successfully');
+    } catch (error) {
+        logError('Failed to initialize extension', error);
     }
-
-    observeDOM();
-
-    document.addEventListener('click', handleClick);
 }
 
 function downloadFile(file) {
@@ -383,10 +402,9 @@ function downloadFile(file) {
 async function handleClick(event) {
     const target = event.target;
     const inputType = target.hasAttribute('data-id') ? 'main' : 'secondary';
-    if (target.nodeName === 'TEXTAREA') {
-        if (inputType === 'main' && !target.parentNode.parentNode.querySelector('.microphone_button')) {
-            addMicrophoneButton(target, inputType);
-        } else if (inputType === 'secondary' && !target.parentNode.querySelector('.microphone_button')) {
+    if (target.nodeName === 'TEXTAREA' || target.id === 'prompt-textarea') {
+        const parentElement = target.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
+        if (parentElement && !parentElement.querySelector('.microphone_button')) {
             addMicrophoneButton(target, inputType);
         }
     }
