@@ -348,7 +348,7 @@ function addMicrophoneButton(inputElement, inputType) {
 
             if (sendButtonContainer) {
                 const wrapperDiv = document.createElement('div');
-                wrapperDiv.className = 'min-w-8';
+                wrapperDiv.className = 'min-w-8 ml-auto';
                 wrapperDiv.appendChild(globalRecorder.micButton);
 
                 sendButtonContainer.parentNode.className = '-mr-0.5 flex gap-2';
