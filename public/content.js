@@ -23,6 +23,29 @@ const SECONDARY_MICROPHONE_BUTTON_CLASSES =
 
 const TESTING = false;
 
+const USAGE_COUNT_KEY = 'whisper_usage_count';
+const POPUP_THRESHOLD = 10;
+const POPUP_FREQUENCY = 3;
+const POPUP_DISMISSED_KEY = 'whisper_popup_dismissed';
+const POPUP_LAST_SHOWN_KEY = 'whisper_popup_last_shown';
+const POPUP_HTML = `
+    <div class="whisper-popup min-w-fit right-full top-0 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 dark:border-gray-600 dark:bg-[#202123]">
+        <div class="flex flex-col text-xs leading-3">
+            <span class="text-gray-700 dark:text-gray-300">Find <b>Whisper to ChatGPT</b> useful?</span>
+            <span class="text-gray-700 dark:text-gray-300">Consider our <a href="https://sonascript.com" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a>!</span>
+        </div>
+        <div class="flex items-center gap-2 border-l border-gray-200 pl-2 dark:border-gray-600 min-w-fit">
+            <input id="whisper-dont-show" type="checkbox" value="" class="w-3 h-3 rounded">
+            <label for="whisper-dont-show" class="text-xs leading-3 text-gray-600 dark:text-gray-400">Don't show again</label>
+            <button class="whisper-popup-close text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+`;
+
 function logError(message, error) {
     console.error(`[Whisper to ChatGPT] ${message}`, error);
 }
@@ -43,6 +66,7 @@ class AudioRecorder {
         this.micButton = null;
         this.token = null;
         this.snippetButtons = [];
+        this.popupContainer = null;
     }
 
     async listenForKeyboardShortcut() {
@@ -178,6 +202,56 @@ class AudioRecorder {
         }
     }
 
+    async incrementUsageCount() {
+        const currentCount = (await retrieveFromStorage(USAGE_COUNT_KEY)) || 0;
+        const newCount = currentCount + 1;
+        await chrome.storage.sync.set({ [USAGE_COUNT_KEY]: newCount });
+
+        const dismissed = await retrieveFromStorage(POPUP_DISMISSED_KEY);
+        const lastShown = await retrieveFromStorage(POPUP_LAST_SHOWN_KEY) || 0;
+        
+        if (!dismissed) {
+            // Show popup for first time users at threshold
+            if (newCount >= POPUP_THRESHOLD && lastShown === 0) {
+                this.showPopup();
+                await chrome.storage.sync.set({ [POPUP_LAST_SHOWN_KEY]: newCount });
+            }
+            // After threshold, show popup every POPUP_FREQUENCY uses
+            else if (newCount >= POPUP_THRESHOLD && (newCount - lastShown) >= POPUP_FREQUENCY) {
+                this.showPopup();
+                await chrome.storage.sync.set({ [POPUP_LAST_SHOWN_KEY]: newCount });
+            }
+        }
+    }
+
+    showPopup() {
+        const existingPopup = document.querySelector('.whisper-popup');
+        if (existingPopup) return;
+
+        const popupElement = document.createElement('div');
+        popupElement.innerHTML = POPUP_HTML;
+        const popup = popupElement.firstElementChild;
+
+        if (this.popupContainer) {
+            this.popupContainer.appendChild(popup);
+        }
+
+        popup.querySelector('.whisper-popup-close').addEventListener('click', async () => {
+            popup.remove();
+            // Update last shown count when popup is manually closed
+            const currentCount = await retrieveFromStorage(USAGE_COUNT_KEY) || 0;
+            await chrome.storage.sync.set({ [POPUP_LAST_SHOWN_KEY]: currentCount });
+        });
+
+        popup.querySelector('#whisper-dont-show').addEventListener('change', async (e) => {
+            if (e.target.checked) {
+                await chrome.storage.sync.set({ [POPUP_DISMISSED_KEY]: true });
+            } else {
+                await chrome.storage.sync.set({ [POPUP_DISMISSED_KEY]: false });
+            }
+        });
+    }
+
     async startRecording() {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -225,7 +299,10 @@ class AudioRecorder {
                     this.recording = false;
                     stream.getTracks().forEach((track) => track.stop());
                 }
+
+                await this.incrementUsageCount();
             });
+
             this.mediaRecorder.start();
             this.setButtonState('recording');
             this.recording = true;
@@ -347,14 +424,26 @@ function addMicrophoneButton(inputElement, inputType) {
             globalRecorder.createMicButton(inputType, 'PRO');
 
             if (sendButtonContainer) {
-                const wrapperDiv = document.createElement('div');
-                wrapperDiv.className = 'min-w-8 ml-auto';
-                wrapperDiv.appendChild(globalRecorder.micButton);
+                // Create the spacer/popup container
+                const spacerDiv = document.createElement('div');
+                spacerDiv.className = 'ml-auto relative flex items-center';
+
+                // Create the microphone wrapper
+                const micWrapperDiv = document.createElement('div');
+                micWrapperDiv.className = 'min-w-8';
+                micWrapperDiv.appendChild(globalRecorder.micButton);
 
                 sendButtonContainer.parentNode.className = '-mr-0.5 flex gap-2';
-                sendButtonContainer.parentNode.insertBefore(wrapperDiv, sendButtonContainer);
+
+                // Insert both elements
+                sendButtonContainer.parentNode.insertBefore(spacerDiv, sendButtonContainer);
+                sendButtonContainer.parentNode.insertBefore(micWrapperDiv, sendButtonContainer);
+
+                // Store reference to spacer for popup positioning
+                globalRecorder.popupContainer = spacerDiv;
             }
         } else if (nonProParentElement && proParentElement) {
+            // Similar structure for non-pro layout
             if (nonProParentElement?.querySelector('.microphone_button')) {
                 return;
             }
