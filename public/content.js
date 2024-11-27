@@ -33,16 +33,21 @@ const getPopupHtml = (firstTime = false) => {
     return `
     <div class="whisper-popup min-w-fit left-full top-0 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 mx-2 dark:border-gray-600 dark:bg-[#202123]">
         <div class="flex flex-col text-xs leading-3">
-            <span class="text-gray-700 dark:text-gray-300">Find <b>Whisper to ChatGPT</b> useful?</span>
-            <span class="text-gray-700 dark:text-gray-300">Consider our <a href="https://sonascript.com" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a> ${firstTime ? ' and get 1 month free' : ''}!</span>
+            <span class="text-gray-700 dark:text-gray-300">Find <b>Whisper to ChatGPT</b> useful? Consider our <a href="https://sonascript.com/?coupon=THANKUWHISPER" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a></span>
+            <span class="text-gray-700 dark:text-gray-300">and get 1 free month with promo code: <b>THANKUWHISPER</b></span>
         </div>
         <div class="ml-auto flex items-center gap-2 border-l border-gray-200 pl-2 dark:border-gray-600 min-w-fit">
             ${
                 firstTime
                     ? ''
                     : `
-            <input id="whisper-dont-show" type="checkbox" value="" class="w-3 h-3 rounded">
-            <label for="whisper-dont-show" class="text-xs leading-3 text-gray-600 dark:text-gray-400">Don't show</label>
+            <div class="flex items-center gap-2">
+                <input id="whisper-dont-show" type="checkbox" value="" class="w-3 h-3 rounded">
+                <div class="flex flex-col text-xs leading-3">
+                    <span class="text-gray-600 dark:text-gray-400">Don't</span>
+                    <span class="text-gray-600 dark:text-gray-400">show</span>
+                </div>
+            </div>
             `
             }
             <button class="whisper-popup-close text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">

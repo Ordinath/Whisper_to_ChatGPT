@@ -42,6 +42,9 @@ function App() {
 
     // retrieve stored data (backwards compatibilly with old version)
     useEffect(() => {
+        // remove test data
+        // chrome.storage?.sync.remove(['whisper_usage_count', 'whisper_popup_dismissed', 'whisper_popup_last_shown']);
+
         const retrieveState = async () => {
             await chrome.storage?.sync.get(
                 [
@@ -347,7 +350,7 @@ function App() {
                             Enjoying Whisper to ChatGPT? <br />
                             Try our desktop application to transcribe and paste across any desktop apps with a shortcut! <br />
                             Get one month free with promo code: THANKUWHISPER <br />
-                            <Link sx={{ fontSize: '1.2rem' }} color="primary" href="https://sonascript.com" target="_blank">
+                            <Link sx={{ fontSize: '1.2rem' }} color="primary" href="https://sonascript.com/?coupon=THANKUWHISPER" target="_blank">
                                 https://sonascript.com
                             </Link>
                         </Typography>
