@@ -1,5 +1,6 @@
 /* global chrome */
 import React, { useState, useEffect } from 'react';
+import Link from '@mui/material/Link';
 import CssBaseline from '@mui/material/CssBaseline';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -108,10 +109,10 @@ function App() {
                         setPromptContent(result.openai_prompts[result.openai_selected_prompt]?.content || '');
                     }
 
-                    // shortcuts config on first launch 
+                    // shortcuts config on first launch
                     if (!result.config_shortcut_first_key && !result.config_shortcut_first_modifier && !result.config_shortcut_second_modifier) {
                         // we set default for windows and mac separately
-                        if ((navigator.userAgentData.platform).toLowerCase().indexOf('mac') > -1) {
+                        if (navigator.userAgentData.platform.toLowerCase().indexOf('mac') > -1) {
                             setShortcutFirstModifier('ctrlKey');
                             setShortcutFirstKey('r');
                             await chrome.storage?.sync.set(
@@ -123,8 +124,7 @@ function App() {
                                     // console.log('Config stored');
                                 }
                             );
-
-                        } else if ((navigator.userAgentData.platform).toLowerCase().indexOf('win') > -1) {
+                        } else if (navigator.userAgentData.platform.toLowerCase().indexOf('win') > -1) {
                             setShortcutFirstModifier('shiftKey');
                             setShortcutSecondModifier('altKey');
                             setShortcutFirstKey('r');
@@ -343,6 +343,16 @@ function App() {
                 <CssBaseline />
                 <Box display="flex" flexWrap="wrap" width="25rem" gap=".5rem" margin="1rem" paddingRight={2} alignItems="center">
                     <Box width="100%" paddingBottom={1}>
+                        <Typography variant="body2" textAlign="center" gutterBottom>
+                            Enjoying Whisper to ChatGPT? <br />
+                            Try our desktop application to transcribe and paste across any desktop apps with a shortcut! <br />
+                            Get one month free with promo code: THANKUWHISPER <br />
+                            <Link sx={{ fontSize: '1.2rem' }} color="primary" href="https://sonascript.com" target="_blank">
+                                https://sonascript.com
+                            </Link>
+                        </Typography>
+                    </Box>
+                    <Box width="100%" paddingBottom={1}>
                         <TextField
                             fullWidth
                             label="OpenAI API Token"
@@ -419,7 +429,10 @@ function App() {
                         </Typography>
                     </Box>
                     <Box width="100%">
-                        <FormControlLabel control={<Switch checked={shortcutEnabled} onChange={handleToggleShortcut} />} label="Enable Microphone Toggle Shortcut" />
+                        <FormControlLabel
+                            control={<Switch checked={shortcutEnabled} onChange={handleToggleShortcut} />}
+                            label="Enable Microphone Toggle Shortcut"
+                        />
                         <FormHelperText>Requires page refresh on an any change.</FormHelperText>
                     </Box>
                     {shortcutEnabled && (
