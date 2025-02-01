@@ -420,7 +420,8 @@ function addMicrophoneButton(inputElement, inputType) {
         let parentElement = inputElement.closest('.group.relative.flex.w-full.items-center');
 
         // let buttonContainer = parentElement?.querySelector('.flex.h-\\[44px\\].items-center.justify-between');
-        let buttonContainer = parentElement?.querySelector('.flex.gap-x-1');
+        //
+        let buttonContainer = parentElement?.querySelectorAll('.flex[class*="gap-x-1.5"]')[1];
 
         // Create or reuse the global recorder
         if (!globalRecorder) {
