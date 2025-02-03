@@ -15,9 +15,9 @@ const SVG_SPINNER_HTML =
 const TRANSCRIPTION_URL = 'https://api.openai.com/v1/audio/transcriptions';
 const TRANSLATION_URL = 'https://api.openai.com/v1/audio/translations';
 const PRO_MAIN_MICROPHONE_BUTTON_CLASSES =
-    'flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary bg-black text-white dark:bg-white dark:text-black disabled:bg-[#D7D7D7]';
+    'flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary bg-black text-white dark:bg-white dark:text-black disabled:bg-[#D7D7D7]';
 const NON_PRO_MAIN_MICROPHONE_BUTTON_CLASSES =
-    'mb-1 mr-1 flex h-8 w-8 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
+    'flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
 const SECONDARY_MICROPHONE_BUTTON_CLASSES =
     'flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
 
@@ -33,8 +33,8 @@ const getPopupHtml = (firstTime = false) => {
     return `
     <div class="whisper-popup min-w-fit left-full top-0 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 mx-2 dark:border-gray-600 dark:bg-[#202123]">
         <div class="flex flex-col text-xs leading-3">
-            <span class="text-gray-700 dark:text-gray-300">Find <b>Whisper to ChatGPT</b> useful? Consider our <a href="https://sonascript.com/?coupon=THANKUWHISPER" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a></span>
-            <span class="text-gray-700 dark:text-gray-300">and get 1 free month with promo code: <b>THANKUWHISPER</b></span>
+            <span class="text-gray-600 dark:text-gray-400">Find <b>Whisper to ChatGPT</b> useful? Consider our <a href="https://sonascript.com/?coupon=THANKUWHISPER" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a></span>
+            <span class="text-gray-600 dark:text-gray-400">and get 1 free month with promo code: <b>THANKUWHISPER</b></span>
         </div>
         <div class="ml-auto flex items-center gap-2 border-l border-gray-200 pl-2 dark:border-gray-600 min-w-fit">
             ${
@@ -301,17 +301,19 @@ class AudioRecorder {
 
                 const requestUrl = (await this.translationEnabled()) ? TRANSLATION_URL : TRANSCRIPTION_URL;
 
-                const response = await fetch(requestUrl, requestOptions);
-                this.setButtonState('ready');
-                if (response.status === 200) {
-                    const result = await response.json();
-                    this.insertTextResult(result.text);
-                    this.recording = false;
-                    stream.getTracks().forEach((track) => track.stop());
-                } else {
-                    this.insertTextResult(
-                        `${response.status} ERROR! API key not provided or OpenAI Server Error! Check the Pop-up window of the Extension to provide API key.`
-                    );
+                try {
+                    const response = await fetch(requestUrl, requestOptions);
+                    this.setButtonState('ready');
+                    if (response.status === 200) {
+                        const result = await response.json();
+                        this.insertTextResult(result.text);
+                    } else {
+                        const errorMessage = getErrorMessage(response.status);
+                        this.insertTextResult(errorMessage);
+                    }
+                } catch (error) {
+                    this.insertTextResult("Network error! Please check your internet connection and try again.");
+                } finally {
                     this.recording = false;
                     stream.getTracks().forEach((track) => track.stop());
                 }
@@ -420,7 +422,8 @@ function addMicrophoneButton(inputElement, inputType) {
         let parentElement = inputElement.closest('.group.relative.flex.w-full.items-center');
 
         // let buttonContainer = parentElement?.querySelector('.flex.h-\\[44px\\].items-center.justify-between');
-        let buttonContainer = parentElement?.querySelector('.flex.gap-x-1');
+        // let buttonContainer = parentElement?.querySelector('.flex.gap-x-1');
+        let buttonContainer = parentElement?.querySelectorAll('.flex[class*="gap-x-1.5"]')[1];
 
         // Create or reuse the global recorder
         if (!globalRecorder) {
@@ -446,7 +449,7 @@ function addMicrophoneButton(inputElement, inputType) {
             globalRecorder.popupContainer = spacerDiv;
 
             const micContainer = document.createElement('div');
-            micContainer.className = 'min-w-8';
+            micContainer.className = 'min-w-9';
             micContainer.appendChild(globalRecorder.micButton);
 
             buttonContainer.insertBefore(micContainer, buttonContainer.firstChild);
@@ -530,5 +533,22 @@ async function handleClick(event) {
         }
     }
 }
+
+const getErrorMessage = (status) => {
+    switch (status) {
+        case 401:
+            return "Authentication error! Please check if your OpenAI API key is valid in the extension settings.";
+        case 429:
+            return "Too many requests to OpenAI server. Please wait a moment and try again.";
+        case 400:
+            return "Bad request! The audio file may be too large or in an unsupported format.";
+        case 500:
+            return "OpenAI server error. Please try again later.";
+        case 503:
+            return "OpenAI service is temporarily unavailable. Please try again later.";
+        default:
+            return `Error ${status}: Unable to process audio. Please check your API key or try again later.`;
+    }
+};
 
 init();
