@@ -350,7 +350,7 @@ function App() {
                             Enjoying Whisper to ChatGPT? <br />
                             Try our desktop application to transcribe and paste across any desktop apps with a shortcut! <br />
                             Get one month free with promo code: THANKUWHISPER <br />
-                            <Link sx={{ fontSize: '1.2rem' }} color="primary" href="https://sonascript.com/?coupon=THANKUWHISPER" target="_blank">
+                            <Link sx={{ fontSize: '1.2rem' }} color="primary" href="https://sonascript.com/?coupon=THANKUWHISPER#pricing" target="_blank">
                                 https://sonascript.com
                             </Link>
                         </Typography>

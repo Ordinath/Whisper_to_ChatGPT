@@ -24,7 +24,7 @@ const SECONDARY_MICROPHONE_BUTTON_CLASSES =
 const TESTING = false;
 
 const USAGE_COUNT_KEY = 'whisper_usage_count';
-const POPUP_THRESHOLD = 10;
+const POPUP_THRESHOLD = 5;
 const POPUP_FREQUENCY = 10;
 const POPUP_DISMISSED_KEY = 'whisper_popup_dismissed';
 const POPUP_LAST_SHOWN_KEY = 'whisper_popup_last_shown';
