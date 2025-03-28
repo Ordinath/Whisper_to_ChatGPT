@@ -345,51 +345,78 @@ class AudioRecorder {
 
     insertTextResult(resultText) {
         const inputElement = this.textarea;
-
-        // Check if the input element is focused
-        const isInputFocused = document.activeElement === inputElement;
-
-        if (isInputFocused) {
-            // If focused, insert at cursor position
+        
+        // If this is a contenteditable div rather than a textarea
+        if (inputElement.isContentEditable) {
+            // Set focus to the input element
+            inputElement.focus();
+            
+            // Insert text at current cursor position or at the end
             const selection = window.getSelection();
             const range = selection.getRangeAt(0);
-
-            // Create a new text node with the result text
+            
+            // Create a text node with the result
             const textNode = document.createTextNode(resultText);
-
-            // Insert the new text node at the current cursor position
+            
+            // Insert the text node
             range.insertNode(textNode);
-
-            // Move the cursor to the end of the inserted text
+            
+            // Move cursor to end of inserted text
             range.setStartAfter(textNode);
             range.setEndAfter(textNode);
             selection.removeAllRanges();
             selection.addRange(range);
+            
+            // Trigger an input event to notify ChatGPT that content has changed
+            const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+            inputElement.dispatchEvent(inputEvent);
         } else {
-            // If not focused, append to the end
-            const lastParagraph = inputElement.querySelector('p:last-child') || inputElement;
+            // Original logic for standard textareas
+            // Check if the input element is focused
+            const isInputFocused = document.activeElement === inputElement;
 
-            // Create a new text node with the result text
-            const textNode = document.createTextNode(resultText);
+            if (isInputFocused) {
+                // If focused, insert at cursor position
+                const selection = window.getSelection();
+                const range = selection.getRangeAt(0);
 
-            // Append the new text node to the last paragraph
-            lastParagraph.appendChild(textNode);
+                // Create a new text node with the result text
+                const textNode = document.createTextNode(resultText);
 
-            // Move the cursor to the end of the appended text
-            const range = document.createRange();
-            range.selectNodeContents(lastParagraph);
-            range.collapse(false);
-            const selection = window.getSelection();
-            selection.removeAllRanges();
-            selection.addRange(range);
+                // Insert the new text node at the current cursor position
+                range.insertNode(textNode);
+
+                // Move the cursor to the end of the inserted text
+                range.setStartAfter(textNode);
+                range.setEndAfter(textNode);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            } else {
+                // If not focused, append to the end
+                const lastParagraph = inputElement.querySelector('p:last-child') || inputElement;
+
+                // Create a new text node with the result text
+                const textNode = document.createTextNode(resultText);
+
+                // Append the new text node to the last paragraph
+                lastParagraph.appendChild(textNode);
+
+                // Move the cursor to the end of the appended text
+                const range = document.createRange();
+                range.selectNodeContents(lastParagraph);
+                range.collapse(false);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+
+            // Trigger an input event to notify any listeners
+            const inputEvent = new Event('input', { bubbles: true, cancelable: true });
+            inputElement.dispatchEvent(inputEvent);
+
+            // Set focus to the input element
+            inputElement.focus();
         }
-
-        // Trigger an input event to notify any listeners
-        const inputEvent = new Event('input', { bubbles: true, cancelable: true });
-        inputElement.dispatchEvent(inputEvent);
-
-        // Set focus to the input element
-        inputElement.focus();
     }
 
     setButtonState(state) {
@@ -419,12 +446,19 @@ let globalRecorder = null;
 
 function addMicrophoneButton(inputElement, inputType) {
     try {
-        let parentElement = inputElement.closest('.group.relative.flex.w-full.items-center');
-
-        // let buttonContainer = parentElement?.querySelector('.flex.h-\\[44px\\].items-center.justify-between');
-        // let buttonContainer = parentElement?.querySelector('.flex.gap-x-1');
-        let buttonContainer = parentElement?.querySelectorAll('.flex[class*="gap-x-1.5"]')[1];
-
+        // Check if button already exists
+        if (document.querySelector('.microphone_button')) {
+            return;
+        }
+        
+        // Find the parent container
+        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end.py-3.pl-3');
+        if (!parentContainer) return;
+        
+        // Find the buttons area where our button should go
+        const buttonsArea = parentContainer.querySelector('.absolute.bottom-1.right-3.flex.items-center.gap-2 .ml-auto.flex.items-center.gap-1\\.5');
+        if (!buttonsArea) return;
+        
         // Create or reuse the global recorder
         if (!globalRecorder) {
             globalRecorder = new AudioRecorder();
@@ -433,27 +467,23 @@ function addMicrophoneButton(inputElement, inputType) {
         } else {
             globalRecorder.textarea = inputElement;
         }
-
-        if (buttonContainer) {
-            if (buttonContainer.querySelector('.microphone_button')) {
-                return;
-            }
-
-            globalRecorder.createMicButton(inputType, 'NON-PRO');
-
-            const spacerDiv = document.createElement('div');
-            spacerDiv.className = 'min-w-fit w-full';
-
-            buttonContainer.parentNode.insertBefore(spacerDiv, buttonContainer.parentNode.lastChild);
-
-            globalRecorder.popupContainer = spacerDiv;
-
-            const micContainer = document.createElement('div');
-            micContainer.className = 'min-w-9';
-            micContainer.appendChild(globalRecorder.micButton);
-
-            buttonContainer.insertBefore(micContainer, buttonContainer.firstChild);
-        }
+        
+        // Create the microphone button
+        globalRecorder.createMicButton(inputType, 'NON-PRO');
+        
+        // Create a container for our button similar to other buttons
+        const micContainer = document.createElement('div');
+        micContainer.className = 'min-w-9';
+        micContainer.appendChild(globalRecorder.micButton);
+        
+        // Insert our button before the existing voice button
+        buttonsArea.insertBefore(micContainer, buttonsArea.firstChild);
+        
+        // Create container for popup messages
+        const popupContainer = document.createElement('div');
+        popupContainer.className = 'min-w-fit w-full relative';
+        parentContainer.appendChild(popupContainer);
+        globalRecorder.popupContainer = popupContainer;
     } catch (error) {
         logError('Failed to add microphone button', error);
     }
@@ -467,12 +497,10 @@ function observeDOM() {
         const callback = function (mutationsList, observer) {
             for (let mutation of mutationsList) {
                 if (mutation.type === 'childList') {
-                    const inputElement = document.querySelector('#prompt-textarea');
-                    if (inputElement) {
-                        const parentElement = inputElement.closest('.group.relative.flex.w-full.items-center');
-                        if (parentElement && !parentElement.querySelector('.microphone_button')) {
-                            addMicrophoneButton(inputElement, 'main');
-                        }
+                    // Look for the contenteditable div with id="prompt-textarea"
+                    const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
+                    if (inputElement && !document.querySelector('.microphone_button')) {
+                        addMicrophoneButton(inputElement, 'main');
                     }
                 }
             }
@@ -521,15 +549,10 @@ function downloadFile(file) {
 
 async function handleClick(event) {
     const target = event.target;
-    const inputType = target.hasAttribute('data-id') ? 'main' : 'secondary';
-    if (target.nodeName === 'TEXTAREA' || target.id === 'prompt-textarea') {
-        // Try both layouts
-        const proParent = target.closest('.group.relative.flex.w-full.items-center');
-        const nonProParent = target.closest('.flex.items-end.gap-1\\.5.pl-4.md\\:gap-2');
-        const parent = proParent || nonProParent;
-
-        if (parent && !parent?.querySelector('.microphone_button')) {
-            addMicrophoneButton(target, inputType);
+    if (target.id === 'prompt-textarea' || 
+        (target.contentEditable === 'true' && target.id === 'prompt-textarea')) {
+        if (!document.querySelector('.microphone_button')) {
+            addMicrophoneButton(target, 'main');
         }
     }
 }
