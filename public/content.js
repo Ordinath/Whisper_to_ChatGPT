@@ -31,7 +31,7 @@ const POPUP_LAST_SHOWN_KEY = 'whisper_popup_last_shown';
 
 const getPopupHtml = (firstTime = false) => {
     return `
-    <div class="whisper-popup min-w-fit left-full top-0 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 mx-2 dark:border-gray-600 dark:bg-[#202123]">
+    <div class="whisper-popup absolute z-20 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 mx-2 dark:border-gray-600 dark:bg-[#202123]" style="min-width: fit-content; width: auto; right: 0;">
         <div class="flex flex-col text-xs leading-3">
             <span class="text-gray-600 dark:text-gray-400">Find <b>Whisper to ChatGPT</b> useful? Consider our <a href="https://sonascript.com/?coupon=THANKUWHISPER#pricing" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a></span>
             <span class="text-gray-600 dark:text-gray-400">and get 1 free month with promo code: <b>THANKUWHISPER</b></span>
@@ -95,15 +95,23 @@ class AudioRecorder {
                     if (shortcutSecondModifier && shortcutSecondModifier !== 'none' && !event[shortcutSecondModifier]) return;
 
                     event.preventDefault();
-                    const promptTextarea = document.querySelector('#prompt-textarea');
-                    if (promptTextarea) {
-                        const proMicButton = promptTextarea.closest('.group.relative.flex.w-full.items-center')?.querySelector('.microphone_button');
-                        const nonProMicButton = promptTextarea.closest('.flex.items-end.gap-1\\.5.md\\:gap-2')?.querySelector('.microphone_button');
 
-                        if (proMicButton) {
-                            proMicButton.click();
-                        } else if (nonProMicButton) {
-                            nonProMicButton.click();
+                    // Find our microphone button based on the new UI structure
+                    const micButton = document.querySelector('.microphone_button');
+                    if (micButton) {
+                        micButton.click();
+                    } else {
+                        // If our button doesn't exist yet, try to find the input and add it
+                        const promptTextarea = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
+                        if (promptTextarea) {
+                            addMicrophoneButton(promptTextarea, 'main');
+                            // Give a small delay to ensure the button is added
+                            setTimeout(() => {
+                                const newMicButton = document.querySelector('.microphone_button');
+                                if (newMicButton) {
+                                    newMicButton.click();
+                                }
+                            }, 100);
                         }
                     }
                 }
@@ -312,7 +320,7 @@ class AudioRecorder {
                         this.insertTextResult(errorMessage);
                     }
                 } catch (error) {
-                    this.insertTextResult("Network error! Please check your internet connection and try again.");
+                    this.insertTextResult('Network error! Please check your internet connection and try again.');
                 } finally {
                     this.recording = false;
                     stream.getTracks().forEach((track) => track.stop());
@@ -345,28 +353,28 @@ class AudioRecorder {
 
     insertTextResult(resultText) {
         const inputElement = this.textarea;
-        
+
         // If this is a contenteditable div rather than a textarea
         if (inputElement.isContentEditable) {
             // Set focus to the input element
             inputElement.focus();
-            
+
             // Insert text at current cursor position or at the end
             const selection = window.getSelection();
             const range = selection.getRangeAt(0);
-            
+
             // Create a text node with the result
             const textNode = document.createTextNode(resultText);
-            
+
             // Insert the text node
             range.insertNode(textNode);
-            
+
             // Move cursor to end of inserted text
             range.setStartAfter(textNode);
             range.setEndAfter(textNode);
             selection.removeAllRanges();
             selection.addRange(range);
-            
+
             // Trigger an input event to notify ChatGPT that content has changed
             const inputEvent = new Event('input', { bubbles: true, cancelable: true });
             inputElement.dispatchEvent(inputEvent);
@@ -450,15 +458,15 @@ function addMicrophoneButton(inputElement, inputType) {
         if (document.querySelector('.microphone_button')) {
             return;
         }
-        
+
         // Find the parent container
         const parentContainer = inputElement.closest('.relative.flex.w-full.items-end.py-3.pl-3');
         if (!parentContainer) return;
-        
+
         // Find the buttons area where our button should go
         const buttonsArea = parentContainer.querySelector('.absolute.bottom-1.right-3.flex.items-center.gap-2 .ml-auto.flex.items-center.gap-1\\.5');
         if (!buttonsArea) return;
-        
+
         // Create or reuse the global recorder
         if (!globalRecorder) {
             globalRecorder = new AudioRecorder();
@@ -467,23 +475,44 @@ function addMicrophoneButton(inputElement, inputType) {
         } else {
             globalRecorder.textarea = inputElement;
         }
-        
+
         // Create the microphone button
         globalRecorder.createMicButton(inputType, 'NON-PRO');
-        
+
         // Create a container for our button similar to other buttons
         const micContainer = document.createElement('div');
         micContainer.className = 'min-w-9';
         micContainer.appendChild(globalRecorder.micButton);
-        
+
         // Insert our button before the existing voice button
         buttonsArea.insertBefore(micContainer, buttonsArea.firstChild);
-        
-        // Create container for popup messages
+
+        // Create container for popup messages that won't affect layout
         const popupContainer = document.createElement('div');
-        popupContainer.className = 'min-w-fit w-full relative';
+        popupContainer.className = 'absolute bottom-12 right-0 z-10'; // Position absolutely to avoid affecting layout
         parentContainer.appendChild(popupContainer);
         globalRecorder.popupContainer = popupContainer;
+
+        // Ensure the textarea uses full width
+        // Find the main container that might be restricting width
+        const textareaContainer = inputElement.closest('.min-w-0.max-w-full.flex-1');
+        if (textareaContainer) {
+            // Make sure it uses the full width
+            textareaContainer.style.width = '100%';
+            textareaContainer.style.maxWidth = '100%';
+        }
+
+        // Also ensure the parent elements use full width
+        const flexContainer = inputElement.closest('.flex.min-h-12.items-start');
+        if (flexContainer) {
+            flexContainer.style.width = '100%';
+        }
+
+        // Fix the ProseMirror parent if present
+        const prosemirrorParent = inputElement.closest('._prosemirror-parent_11fu7_1');
+        if (prosemirrorParent) {
+            prosemirrorParent.style.width = '100%';
+        }
     } catch (error) {
         logError('Failed to add microphone button', error);
     }
@@ -495,19 +524,24 @@ function observeDOM() {
         const config = { childList: true, subtree: true };
 
         const callback = function (mutationsList, observer) {
-            for (let mutation of mutationsList) {
-                if (mutation.type === 'childList') {
-                    // Look for the contenteditable div with id="prompt-textarea"
-                    const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
-                    if (inputElement && !document.querySelector('.microphone_button')) {
-                        addMicrophoneButton(inputElement, 'main');
-                    }
+            // Check if our button exists
+            if (!document.querySelector('.microphone_button')) {
+                // Look for the contenteditable div with id="prompt-textarea"
+                const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
+                if (inputElement) {
+                    addMicrophoneButton(inputElement, 'main');
                 }
             }
         };
 
         const observer = new MutationObserver(callback);
         observer.observe(targetNode, config);
+
+        // Also check immediately in case the page is already loaded
+        const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
+        if (inputElement && !document.querySelector('.microphone_button')) {
+            addMicrophoneButton(inputElement, 'main');
+        }
     } catch (error) {
         logError('Failed to observe DOM', error);
     }
@@ -549,8 +583,7 @@ function downloadFile(file) {
 
 async function handleClick(event) {
     const target = event.target;
-    if (target.id === 'prompt-textarea' || 
-        (target.contentEditable === 'true' && target.id === 'prompt-textarea')) {
+    if (target.id === 'prompt-textarea' || (target.contentEditable === 'true' && target.id === 'prompt-textarea')) {
         if (!document.querySelector('.microphone_button')) {
             addMicrophoneButton(target, 'main');
         }
@@ -560,15 +593,15 @@ async function handleClick(event) {
 const getErrorMessage = (status) => {
     switch (status) {
         case 401:
-            return "Authentication error! Please check if your OpenAI API key is valid in the extension settings.";
+            return 'Authentication error! Please check if your OpenAI API key is valid in the extension settings.';
         case 429:
-            return "Too many requests to OpenAI server. Please wait a moment and try again.";
+            return 'Too many requests to OpenAI server. Please wait a moment and try again.';
         case 400:
-            return "Bad request! The audio file may be too large or in an unsupported format.";
+            return 'Bad request! The audio file may be too large or in an unsupported format.';
         case 500:
-            return "OpenAI server error. Please try again later.";
+            return 'OpenAI server error. Please try again later.';
         case 503:
-            return "OpenAI service is temporarily unavailable. Please try again later.";
+            return 'OpenAI service is temporarily unavailable. Please try again later.';
         default:
             return `Error ${status}: Unable to process audio. Please check your API key or try again later.`;
     }
