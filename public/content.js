@@ -458,15 +458,15 @@ function addMicrophoneButton(inputElement, inputType) {
         if (document.querySelector('.microphone_button')) {
             return;
         }
-
-        // Find the parent container
-        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end.py-3.pl-3');
+        
+        // Find the parent container - updated selector to match new structure
+        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end.px-3.py-3');
         if (!parentContainer) return;
-
-        // Find the buttons area where our button should go
-        const buttonsArea = parentContainer.querySelector('.absolute.bottom-1.right-3.flex.items-center.gap-2 .ml-auto.flex.items-center.gap-1\\.5');
+        
+        // Find the buttons area where our button should go - updated selector
+        const buttonsArea = parentContainer.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
         if (!buttonsArea) return;
-
+        
         // Create or reuse the global recorder
         if (!globalRecorder) {
             globalRecorder = new AudioRecorder();
@@ -475,43 +475,47 @@ function addMicrophoneButton(inputElement, inputType) {
         } else {
             globalRecorder.textarea = inputElement;
         }
-
+        
         // Create the microphone button
         globalRecorder.createMicButton(inputType, 'NON-PRO');
-
+        
         // Create a container for our button similar to other buttons
         const micContainer = document.createElement('div');
         micContainer.className = 'min-w-9';
         micContainer.appendChild(globalRecorder.micButton);
-
+        
         // Insert our button before the existing voice button
         buttonsArea.insertBefore(micContainer, buttonsArea.firstChild);
-
+        
         // Create container for popup messages that won't affect layout
         const popupContainer = document.createElement('div');
         popupContainer.className = 'absolute bottom-12 right-0 z-10'; // Position absolutely to avoid affecting layout
         parentContainer.appendChild(popupContainer);
         globalRecorder.popupContainer = popupContainer;
-
-        // Ensure the textarea uses full width
-        // Find the main container that might be restricting width
+        
+        // Ensure proper width of text area containers
         const textareaContainer = inputElement.closest('.min-w-0.max-w-full.flex-1');
         if (textareaContainer) {
-            // Make sure it uses the full width
             textareaContainer.style.width = '100%';
             textareaContainer.style.maxWidth = '100%';
         }
-
-        // Also ensure the parent elements use full width
+        
+        // Fix width of the flex container
         const flexContainer = inputElement.closest('.flex.min-h-12.items-start');
         if (flexContainer) {
             flexContainer.style.width = '100%';
         }
-
-        // Fix the ProseMirror parent if present
+        
+        // Fix width of the ProseMirror container
         const prosemirrorParent = inputElement.closest('._prosemirror-parent_11fu7_1');
         if (prosemirrorParent) {
             prosemirrorParent.style.width = '100%';
+        }
+        
+        // Fix width of the grid container
+        const gridContainer = inputElement.closest('.relative.ml-1\\.5.grid.grid-cols-\\[auto_minmax\\(0,1fr\\)\\]');
+        if (gridContainer) {
+            gridContainer.style.width = '100%';
         }
     } catch (error) {
         logError('Failed to add microphone button', error);
@@ -529,18 +533,25 @@ function observeDOM() {
                 // Look for the contenteditable div with id="prompt-textarea"
                 const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
                 if (inputElement) {
-                    addMicrophoneButton(inputElement, 'main');
+                    // Make sure the button container exists before trying to add the button
+                    const buttonContainer = document.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
+                    if (buttonContainer) {
+                        addMicrophoneButton(inputElement, 'main');
+                    }
                 }
             }
         };
 
         const observer = new MutationObserver(callback);
         observer.observe(targetNode, config);
-
-        // Also check immediately in case the page is already loaded
+        
+        // Initial check for the input element
         const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
         if (inputElement && !document.querySelector('.microphone_button')) {
-            addMicrophoneButton(inputElement, 'main');
+            const buttonContainer = document.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
+            if (buttonContainer) {
+                addMicrophoneButton(inputElement, 'main');
+            }
         }
     } catch (error) {
         logError('Failed to observe DOM', error);
