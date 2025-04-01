@@ -28,36 +28,41 @@ const POPUP_THRESHOLD = 5;
 const POPUP_FREQUENCY = 10;
 const POPUP_DISMISSED_KEY = 'whisper_popup_dismissed';
 const POPUP_LAST_SHOWN_KEY = 'whisper_popup_last_shown';
+const POPUP_CLOSE_COUNT_KEY = 'whisper_popup_close_count';
+const POPUP_MIN_CLOSES_FOR_DONT_SHOW = 2;
 
-const getPopupHtml = (firstTime = false) => {
-    return `
-    <div class="whisper-popup absolute z-20 flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-2 py-1 mx-2 dark:border-gray-600 dark:bg-[#202123]" style="min-width: fit-content; width: auto; right: 0;">
-        <div class="flex flex-col text-xs leading-3">
-            <span class="text-gray-600 dark:text-gray-400">Find <b>Whisper to ChatGPT</b> useful? Consider our <a href="https://sonascript.com/?coupon=THANKUWHISPER#pricing" target="_blank" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-200"><b>desktop app</b></a></span>
-            <span class="text-gray-600 dark:text-gray-400">and get 1 free month with promo code: <b>THANKUWHISPER</b></span>
-        </div>
-        <div class="ml-auto flex items-center gap-2 border-l border-gray-200 pl-2 dark:border-gray-600 min-w-fit">
-            ${
-                firstTime
-                    ? ''
-                    : `
+const getPopupHtml = (showDontShowOption = false) => {
+    if (showDontShowOption) {
+        return `
+        <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 pr-2 pl-3 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
             <div class="flex items-center gap-2">
-                <input id="whisper-dont-show" type="checkbox" value="" class="w-3 h-3 rounded">
-                <div class="flex flex-col text-xs leading-3">
-                    <span class="text-gray-600 dark:text-gray-400">Don't</span>
-                    <span class="text-gray-600 dark:text-gray-400">show</span>
-                </div>
+                <input type="checkbox" id="whisper-dont-show" class="rounded border-gray-300">
+                <label for="whisper-dont-show" class="text-token-text-secondary">Don't show this message again</label>
             </div>
-            `
-            }
-            <button class="whisper-popup-close text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                <svg class="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button type="button" class="whisper-popup-close ml-1 text-token-text-secondary hover:text-token-text-primary flex items-center justify-center h-5 w-5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
+        </div>`;
+    }
+
+    return `
+    <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 pr-2 pl-3 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
+        <div class="flex flex-col items-start leading-tight">
+            <div class="text-token-text-secondary">
+                Enjoying Whisper To ChatGPT?
+            </div>
+            <div class="flex items-center gap-1 text-token-text-secondary">
+                Try our <a href="https://sonascript.com/?coupon=THANKUWHISPER#pricing" target="_blank" class="text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium">Desktop App</a> and dictate anywhere!
+            </div>
         </div>
-    </div>
-`;
+        <button type="button" class="whisper-popup-close ml-1 text-token-text-secondary hover:text-token-text-primary flex items-center justify-center h-5 w-5">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+        </button>
+    </div>`;
 };
 
 function logError(message, error) {
@@ -81,6 +86,7 @@ class AudioRecorder {
         this.token = null;
         this.snippetButtons = [];
         this.popupContainer = null;
+        this.activePopup = null;
     }
 
     async listenForKeyboardShortcut() {
@@ -247,33 +253,79 @@ class AudioRecorder {
         }
     }
 
-    showPopup(firstTime = false) {
-        // console.log('showPopup');
-        const existingPopup = document.querySelector('.whisper-popup');
-        if (existingPopup) return;
+    async showPopup(firstTime = false) {
+        // If there's already an active popup, don't show another one
+        if (this.activePopup && document.contains(this.activePopup)) {
+            return;
+        }
+
+        // Get the close count
+        const closeCount = (await retrieveFromStorage(POPUP_CLOSE_COUNT_KEY)) || 0;
 
         const popupElement = document.createElement('div');
-        popupElement.innerHTML = getPopupHtml(firstTime);
+        popupElement.className = 'whisper-popup';
+
+        // If we've closed it 3 times and this is after closing the promo message
+        const showDontShowOption = closeCount > 0 && closeCount % POPUP_MIN_CLOSES_FOR_DONT_SHOW === 0;
+        popupElement.innerHTML = getPopupHtml(showDontShowOption);
         const popup = popupElement.firstElementChild;
 
         if (this.popupContainer) {
             this.popupContainer.appendChild(popup);
+            this.activePopup = popup; // Store reference to the active popup
         }
 
-        popup.querySelector('.whisper-popup-close').addEventListener('click', async () => {
-            popup.remove();
-            // Update last shown count when popup is manually closed
-            const currentCount = (await retrieveFromStorage(USAGE_COUNT_KEY)) || 0;
-            await chrome.storage.sync.set({ [POPUP_LAST_SHOWN_KEY]: currentCount });
+        // Handle popup close and checkbox
+        const closeButton = popup.querySelector('.whisper-popup-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', async (e) => {
+                // Prevent event propagation
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (showDontShowOption) {
+                    // If this is the "don't show again" popup, check if the checkbox is checked
+                    const checkbox = popup.querySelector('#whisper-dont-show');
+                    if (checkbox && checkbox.checked) {
+                        await chrome.storage.sync.set({ [POPUP_DISMISSED_KEY]: true });
+                    }
+                    // Reset close count after showing "don't show again" option
+                    await chrome.storage.sync.set({ [POPUP_CLOSE_COUNT_KEY]: 0 });
+                } else {
+                    // Increment and store close count
+                    const newCloseCount = closeCount + 1;
+                    await chrome.storage.sync.set({ [POPUP_CLOSE_COUNT_KEY]: newCloseCount });
+
+                    // If we've just hit the threshold, show the "don't show again" popup
+                    if (newCloseCount % POPUP_MIN_CLOSES_FOR_DONT_SHOW === 0) {
+                        this.activePopup = null; // Clear the active popup reference
+                        popup.remove();
+                        this.showPopup(false); // Show the "don't show again" popup
+                        return;
+                    }
+                }
+
+                // Update last shown count and remove popup
+                const currentCount = (await retrieveFromStorage(USAGE_COUNT_KEY)) || 0;
+                await chrome.storage.sync.set({ [POPUP_LAST_SHOWN_KEY]: currentCount });
+                this.activePopup = null; // Clear the active popup reference
+                popup.remove();
+            });
+        }
+
+        // Add cleanup when popup is removed from DOM
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                mutation.removedNodes.forEach((node) => {
+                    if (node === popup) {
+                        this.activePopup = null;
+                        observer.disconnect();
+                    }
+                });
+            });
         });
 
-        popup.querySelector('#whisper-dont-show')?.addEventListener('change', async (e) => {
-            if (e.target.checked) {
-                await chrome.storage.sync.set({ [POPUP_DISMISSED_KEY]: true });
-            } else {
-                await chrome.storage.sync.set({ [POPUP_DISMISSED_KEY]: false });
-            }
-        });
+        observer.observe(popup.parentNode, { childList: true });
     }
 
     async startRecording() {
@@ -464,8 +516,7 @@ function addMicrophoneButton(inputElement, inputType) {
         if (!parentContainer) return;
 
         // Find the buttons area with more flexible selectors
-        const buttonsArea =
-            parentContainer.querySelector('.ml-auto.flex.items-center.gap-1\\.5') || parentContainer.querySelector('.ml-auto.flex.items-center');
+        const buttonsArea = parentContainer.querySelector('.absolute.bottom-0.right-3 .ml-auto.flex.items-center.gap-1\\.5');
         if (!buttonsArea) return;
 
         // Create or reuse the global recorder
@@ -480,18 +531,23 @@ function addMicrophoneButton(inputElement, inputType) {
         // Create the microphone button
         globalRecorder.createMicButton(inputType, 'NON-PRO');
 
-        // Create a container for our button similar to other buttons
+        // Create a container for our button
         const micContainer = document.createElement('div');
         micContainer.className = 'min-w-9';
         micContainer.appendChild(globalRecorder.micButton);
 
-        // Insert our button before the existing voice button
-        buttonsArea.insertBefore(micContainer, buttonsArea.firstChild);
-
-        // Create container for popup messages that won't affect layout
+        // Create container for popup messages
         const popupContainer = document.createElement('div');
-        popupContainer.className = 'absolute bottom-12 right-0 z-20'; // Increased z-index to ensure visibility
-        parentContainer.appendChild(popupContainer);
+        popupContainer.className = 'absolute right-full mr-2 whitespace-nowrap'; // Position to the left
+
+        // Create a wrapper for the mic button and its popup
+        const micWrapper = document.createElement('div');
+        micWrapper.className = 'relative flex items-center';
+        micWrapper.appendChild(popupContainer);
+        micWrapper.appendChild(micContainer);
+
+        // Insert our wrapper at the start of the buttons area
+        buttonsArea.insertBefore(micWrapper, buttonsArea.firstChild);
         globalRecorder.popupContainer = popupContainer;
 
         // Ensure proper width of text area containers
@@ -501,7 +557,6 @@ function addMicrophoneButton(inputElement, inputType) {
             textareaContainer.style.maxWidth = '100%';
         }
     } catch (error) {
-        // Log the error but don't throw since the functionality works
         console.log('[Whisper to ChatGPT] Non-critical error in button addition:', error);
     }
 }

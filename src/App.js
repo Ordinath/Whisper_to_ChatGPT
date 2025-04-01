@@ -43,7 +43,7 @@ function App() {
     // retrieve stored data (backwards compatibilly with old version)
     useEffect(() => {
         // remove test data
-        // chrome.storage?.sync.remove(['whisper_usage_count', 'whisper_popup_dismissed', 'whisper_popup_last_shown']);
+        // chrome.storage?.sync.remove(['whisper_popup_dismissed', 'whisper_popup_last_shown', 'whisper_popup_close_count']);
 
         const retrieveState = async () => {
             await chrome.storage?.sync.get(
