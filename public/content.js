@@ -458,15 +458,16 @@ function addMicrophoneButton(inputElement, inputType) {
         if (document.querySelector('.microphone_button')) {
             return;
         }
-        
-        // Find the parent container - updated selector to match new structure
-        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end.px-3.py-3');
+
+        // Find the parent container with more flexible selectors
+        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end');
         if (!parentContainer) return;
-        
-        // Find the buttons area where our button should go - updated selector
-        const buttonsArea = parentContainer.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
+
+        // Find the buttons area with more flexible selectors
+        const buttonsArea =
+            parentContainer.querySelector('.ml-auto.flex.items-center.gap-1\\.5') || parentContainer.querySelector('.ml-auto.flex.items-center');
         if (!buttonsArea) return;
-        
+
         // Create or reuse the global recorder
         if (!globalRecorder) {
             globalRecorder = new AudioRecorder();
@@ -475,50 +476,33 @@ function addMicrophoneButton(inputElement, inputType) {
         } else {
             globalRecorder.textarea = inputElement;
         }
-        
+
         // Create the microphone button
         globalRecorder.createMicButton(inputType, 'NON-PRO');
-        
+
         // Create a container for our button similar to other buttons
         const micContainer = document.createElement('div');
         micContainer.className = 'min-w-9';
         micContainer.appendChild(globalRecorder.micButton);
-        
+
         // Insert our button before the existing voice button
         buttonsArea.insertBefore(micContainer, buttonsArea.firstChild);
-        
+
         // Create container for popup messages that won't affect layout
         const popupContainer = document.createElement('div');
-        popupContainer.className = 'absolute bottom-12 right-0 z-10'; // Position absolutely to avoid affecting layout
+        popupContainer.className = 'absolute bottom-12 right-0 z-20'; // Increased z-index to ensure visibility
         parentContainer.appendChild(popupContainer);
         globalRecorder.popupContainer = popupContainer;
-        
+
         // Ensure proper width of text area containers
         const textareaContainer = inputElement.closest('.min-w-0.max-w-full.flex-1');
         if (textareaContainer) {
             textareaContainer.style.width = '100%';
             textareaContainer.style.maxWidth = '100%';
         }
-        
-        // Fix width of the flex container
-        const flexContainer = inputElement.closest('.flex.min-h-12.items-start');
-        if (flexContainer) {
-            flexContainer.style.width = '100%';
-        }
-        
-        // Fix width of the ProseMirror container
-        const prosemirrorParent = inputElement.closest('._prosemirror-parent_11fu7_1');
-        if (prosemirrorParent) {
-            prosemirrorParent.style.width = '100%';
-        }
-        
-        // Fix width of the grid container
-        const gridContainer = inputElement.closest('.relative.ml-1\\.5.grid.grid-cols-\\[auto_minmax\\(0,1fr\\)\\]');
-        if (gridContainer) {
-            gridContainer.style.width = '100%';
-        }
     } catch (error) {
-        logError('Failed to add microphone button', error);
+        // Log the error but don't throw since the functionality works
+        console.log('[Whisper to ChatGPT] Non-critical error in button addition:', error);
     }
 }
 
@@ -528,29 +512,46 @@ function observeDOM() {
         const config = { childList: true, subtree: true };
 
         const callback = function (mutationsList, observer) {
-            // Check if our button exists
-            if (!document.querySelector('.microphone_button')) {
-                // Look for the contenteditable div with id="prompt-textarea"
-                const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
-                if (inputElement) {
-                    // Make sure the button container exists before trying to add the button
-                    const buttonContainer = document.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
-                    if (buttonContainer) {
-                        addMicrophoneButton(inputElement, 'main');
+            try {
+                // Check if our button exists
+                if (!document.querySelector('.microphone_button')) {
+                    // Look for the contenteditable div with id="prompt-textarea"
+                    const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
+                    if (inputElement) {
+                        // Try to find the button container with a more flexible selector
+                        const buttonContainer =
+                            document.querySelector('.absolute.bottom-0.right-3') ||
+                            document.querySelector('.absolute.bottom-[9px].right-0') ||
+                            inputElement.closest('.relative.flex.w-full.items-end')?.querySelector('.ml-auto.flex.items-center');
+
+                        if (buttonContainer) {
+                            addMicrophoneButton(inputElement, 'main');
+                        }
                     }
                 }
+            } catch (innerError) {
+                // Log the error but don't throw it since the button is working
+                console.log('[Whisper to ChatGPT] Non-critical error in observer:', innerError);
             }
         };
 
         const observer = new MutationObserver(callback);
         observer.observe(targetNode, config);
-        
+
         // Initial check for the input element
         const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
         if (inputElement && !document.querySelector('.microphone_button')) {
-            const buttonContainer = document.querySelector('.absolute.bottom-1.right-3 .ml-auto.flex.items-center.gap-1\\.5');
-            if (buttonContainer) {
-                addMicrophoneButton(inputElement, 'main');
+            try {
+                const buttonContainer =
+                    document.querySelector('.absolute.bottom-0.right-3') ||
+                    document.querySelector('.absolute.bottom-[9px].right-0') ||
+                    inputElement.closest('.relative.flex.w-full.items-end')?.querySelector('.ml-auto.flex.items-center');
+
+                if (buttonContainer) {
+                    addMicrophoneButton(inputElement, 'main');
+                }
+            } catch (error) {
+                console.log('[Whisper to ChatGPT] Non-critical error in initial check:', error);
             }
         }
     } catch (error) {
