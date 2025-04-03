@@ -34,8 +34,8 @@ const POPUP_MIN_CLOSES_FOR_DONT_SHOW = 2;
 const getPopupHtml = (showDontShowOption = false) => {
     if (showDontShowOption) {
         return `
-        <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 pr-2 pl-3 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
-            <div class="flex items-center gap-2">
+        <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
+            <div class="flex items-center gap-2 pl-2">
                 <input type="checkbox" id="whisper-dont-show" class="rounded border-gray-300">
                 <label for="whisper-dont-show" class="text-token-text-secondary">Don't show this message again</label>
             </div>
@@ -48,8 +48,8 @@ const getPopupHtml = (showDontShowOption = false) => {
     }
 
     return `
-    <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 pr-2 pl-3 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
-        <div class="flex flex-col items-start leading-tight">
+    <div class="inline-flex h-9 rounded-full border text-[13px] font-medium text-token-text-secondary border-token-border-light dark:border-token-border-light flex items-center justify-center gap-1 bg-token-main-surface-secondary dark:bg-gray-700" style="transform: translateY(-2px);">
+        <div class="flex flex-col items-start leading-tight pl-2">
             <div class="text-token-text-secondary">
                 Enjoying Whisper To ChatGPT?
             </div>
@@ -325,7 +325,9 @@ class AudioRecorder {
             });
         });
 
-        observer.observe(popup.parentNode, { childList: true });
+        if (popup.parentNode) {
+            observer.observe(popup.parentNode, { childList: true });
+        }
     }
 
     async startRecording() {
@@ -511,12 +513,12 @@ function addMicrophoneButton(inputElement, inputType) {
             return;
         }
 
-        // Find the parent container with more flexible selectors
+        // Find the parent container with the new class structure
         const parentContainer = inputElement.closest('.relative.flex.w-full.items-end');
         if (!parentContainer) return;
 
-        // Find the buttons area with more flexible selectors
-        const buttonsArea = parentContainer.querySelector('.absolute.bottom-0.right-3 .ml-auto.flex.items-center.gap-1\\.5');
+        // Find the buttons area with the new class structure
+        const buttonsArea = parentContainer.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center.gap-1\\.5');
         if (!buttonsArea) return;
 
         // Create or reuse the global recorder
@@ -551,7 +553,7 @@ function addMicrophoneButton(inputElement, inputType) {
         globalRecorder.popupContainer = popupContainer;
 
         // Ensure proper width of text area containers
-        const textareaContainer = inputElement.closest('.min-w-0.max-w-full.flex-1');
+        const textareaContainer = inputElement.closest('.max-w-full.min-w-0.flex-1');
         if (textareaContainer) {
             textareaContainer.style.width = '100%';
             textareaContainer.style.maxWidth = '100%';
@@ -573,11 +575,10 @@ function observeDOM() {
                     // Look for the contenteditable div with id="prompt-textarea"
                     const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
                     if (inputElement) {
-                        // Try to find the button container with a more flexible selector
-                        const buttonContainer =
-                            document.querySelector('.absolute.bottom-0.right-3') ||
-                            document.querySelector('.absolute.bottom-[9px].right-0') ||
-                            inputElement.closest('.relative.flex.w-full.items-end')?.querySelector('.ml-auto.flex.items-center');
+                        // Try to find the button container with the new selector
+                        const buttonContainer = inputElement
+                            .closest('.relative.flex.w-full.items-end')
+                            ?.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center');
 
                         if (buttonContainer) {
                             addMicrophoneButton(inputElement, 'main');
@@ -585,7 +586,6 @@ function observeDOM() {
                     }
                 }
             } catch (innerError) {
-                // Log the error but don't throw it since the button is working
                 console.log('[Whisper to ChatGPT] Non-critical error in observer:', innerError);
             }
         };
@@ -597,10 +597,9 @@ function observeDOM() {
         const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
         if (inputElement && !document.querySelector('.microphone_button')) {
             try {
-                const buttonContainer =
-                    document.querySelector('.absolute.bottom-0.right-3') ||
-                    document.querySelector('.absolute.bottom-[9px].right-0') ||
-                    inputElement.closest('.relative.flex.w-full.items-end')?.querySelector('.ml-auto.flex.items-center');
+                const buttonContainer = inputElement
+                    .closest('.relative.flex.w-full.items-end')
+                    ?.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center');
 
                 if (buttonContainer) {
                     addMicrophoneButton(inputElement, 'main');
