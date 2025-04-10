@@ -513,13 +513,16 @@ function addMicrophoneButton(inputElement, inputType) {
             return;
         }
 
-        // Find the parent container with the new class structure
+        // Find the parent container
         const parentContainer = inputElement.closest('.relative.flex.w-full.items-end');
         if (!parentContainer) return;
 
-        // Find the buttons area with the new class structure
-        const buttonsArea = parentContainer.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center.gap-1\\.5');
-        if (!buttonsArea) return;
+        // Find the new buttons area
+        const buttonsArea = parentContainer.querySelector('.absolute.end-3.bottom-0 .ms-auto.flex.items-center.gap-1\\.5');
+        if (!buttonsArea) {
+             // console.log("Buttons area not found for updated popup fix.");
+            return;
+        }
 
         // Create or reuse the global recorder
         if (!globalRecorder) {
@@ -533,24 +536,32 @@ function addMicrophoneButton(inputElement, inputType) {
         // Create the microphone button
         globalRecorder.createMicButton(inputType, 'NON-PRO');
 
-        // Create a container for our button
+        // Create the wrapper for the mic button and popup
+        const micWrapper = document.createElement('div');
+        // Make it relative for positioning context, inline-block to fit in flex layout
+        micWrapper.className = 'relative';
+        micWrapper.style.display = 'inline-block'; // Ensure it behaves well within the flex container
+
+        // Create container for popup messages, positioned absolutely using inline styles
+        const popupContainer = document.createElement('div');
+        popupContainer.className = 'whitespace-nowrap z-10'; // Keep necessary utility classes
+        popupContainer.style.position = 'absolute';
+        popupContainer.style.bottom = '0';     // Align bottom edge with micWrapper's bottom edge
+        popupContainer.style.right = '100%';   // Place right edge coincident with micWrapper's left edge
+        popupContainer.style.marginRight = '0.5rem'; // Add 8px margin to push it left (gap)
+
+        // Create the container for just the mic button
         const micContainer = document.createElement('div');
-        micContainer.className = 'min-w-9';
+        micContainer.className = 'min-w-9'; // Keep consistent size
         micContainer.appendChild(globalRecorder.micButton);
 
-        // Create container for popup messages
-        const popupContainer = document.createElement('div');
-        popupContainer.className = 'absolute right-full mr-2 whitespace-nowrap'; // Position to the left
-
-        // Create a wrapper for the mic button and its popup
-        const micWrapper = document.createElement('div');
-        micWrapper.className = 'relative flex items-center';
+        // Append popup and mic containers to the wrapper
         micWrapper.appendChild(popupContainer);
         micWrapper.appendChild(micContainer);
 
-        // Insert our wrapper at the start of the buttons area
+        // Insert the complete wrapper into the buttons area
         buttonsArea.insertBefore(micWrapper, buttonsArea.firstChild);
-        globalRecorder.popupContainer = popupContainer;
+        globalRecorder.popupContainer = popupContainer; // Assign the correct container
 
         // Ensure proper width of text area containers
         const textareaContainer = inputElement.closest('.max-w-full.min-w-0.flex-1');
@@ -575,13 +586,13 @@ function observeDOM() {
                     // Look for the contenteditable div with id="prompt-textarea"
                     const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
                     if (inputElement) {
-                        // Try to find the button container with the new selector
-                        const buttonContainer = inputElement
-                            .closest('.relative.flex.w-full.items-end')
-                            ?.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center');
-
-                        if (buttonContainer) {
-                            addMicrophoneButton(inputElement, 'main');
+                        // Try to find the button container using the updated selector path
+                        const parentContainer = inputElement.closest('.relative.flex.w-full.items-end');
+                        if (parentContainer) {
+                             const buttonContainer = parentContainer.querySelector('.absolute.end-3.bottom-0 .ms-auto.flex.items-center.gap-1\\.5');
+                            if (buttonContainer) {
+                                addMicrophoneButton(inputElement, 'main');
+                            }
                         }
                     }
                 }
@@ -596,13 +607,13 @@ function observeDOM() {
         // Initial check for the input element
         const inputElement = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
         if (inputElement && !document.querySelector('.microphone_button')) {
-            try {
-                const buttonContainer = inputElement
-                    .closest('.relative.flex.w-full.items-end')
-                    ?.querySelector('.absolute.right-3.bottom-0 .ms-auto.flex.items-center');
-
-                if (buttonContainer) {
-                    addMicrophoneButton(inputElement, 'main');
+             try {
+                const parentContainer = inputElement.closest('.relative.flex.w-full.items-end');
+                if (parentContainer) {
+                    const buttonContainer = parentContainer.querySelector('.absolute.end-3.bottom-0 .ms-auto.flex.items-center.gap-1\\.5');
+                    if (buttonContainer) {
+                        addMicrophoneButton(inputElement, 'main');
+                    }
                 }
             } catch (error) {
                 console.log('[Whisper to ChatGPT] Non-critical error in initial check:', error);
