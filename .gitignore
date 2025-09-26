@@ -24,4 +24,5 @@ yarn-error.log*
 *.zip
 .DS_Store
 
+clogs/
 logs/

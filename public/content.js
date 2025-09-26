@@ -23,11 +23,8 @@ const SECONDARY_MICROPHONE_BUTTON_CLASSES =
 
 // --- Updated Constants for Selectors ---
 const INPUT_SELECTOR = 'div[contenteditable="true"][id="prompt-textarea"]';
-// This is the container that holds both the input and the entire buttons bar at the bottom
-const PARENT_CONTAINER_SELECTOR = '.relative.flex.min-h-14.w-full.items-end';
-// This is the specific area within the buttons bar where the send/dictate buttons are
-const BUTTONS_AREA_SELECTOR = 'div[data-testid="composer-trailing-actions"] .ms-auto.flex.items-center.gap-1\\.5';
-const TEXTAREA_WIDTH_CONTAINER_SELECTOR = '.max-w-full.min-w-0.flex-1'; // Seems to be stable
+const PARENT_CONTAINER_SELECTOR = '.grid.grid-cols-\\[auto_1fr_auto\\]';
+const BUTTONS_AREA_SELECTOR = '.\\[grid-area\\:trailing\\] .ms-auto.flex.items-center';
 const MIC_BUTTON_SELECTOR = '.microphone_button';
 // --- End Updated Constants ---
 
@@ -527,14 +524,12 @@ function addMicrophoneButton(inputElement, inputType) {
         // This parent is crucial for correctly locating the buttonsArea
         const overallInputAndButtonContainer = inputElement.closest(PARENT_CONTAINER_SELECTOR);
         if (!overallInputAndButtonContainer) {
-            // console.log("Overall input and button container not found with selector:", PARENT_CONTAINER_SELECTOR);
             return;
         }
 
         // Find the new buttons area within the overall container
         const buttonsArea = overallInputAndButtonContainer.querySelector(BUTTONS_AREA_SELECTOR);
         if (!buttonsArea) {
-            // console.log("Buttons area not found with selector:", BUTTONS_AREA_SELECTOR);
             return;
         }
 
@@ -574,17 +569,6 @@ function addMicrophoneButton(inputElement, inputType) {
         // Insert the complete wrapper into the buttons area
         buttonsArea.insertBefore(micWrapper, buttonsArea.firstChild);
         globalRecorder.popupContainer = popupContainer;
-
-        // Ensure proper width of text area containers
-        // The TEXTAREA_WIDTH_CONTAINER_SELECTOR is relative to the inputElement's parents
-        const textareaParent = inputElement.closest('.relative.mx-5.flex.min-h-14.flex-auto.bg-transparent.items-start');
-        if (textareaParent) {
-            const textareaContainer = textareaParent.querySelector(TEXTAREA_WIDTH_CONTAINER_SELECTOR);
-            if (textareaContainer) {
-                textareaContainer.style.width = '100%';
-                textareaContainer.style.maxWidth = '100%';
-            }
-        }
     } catch (error) {
         console.log('[Whisper to ChatGPT] Non-critical error in button addition:', error);
     }
@@ -601,7 +585,7 @@ function tryAddButton() {
         if (inputElement) {
             const overallInputAndButtonContainer = inputElement.closest(PARENT_CONTAINER_SELECTOR);
             if (overallInputAndButtonContainer) {
-                 const buttonContainer = overallInputAndButtonContainer.querySelector(BUTTONS_AREA_SELECTOR);
+                const buttonContainer = overallInputAndButtonContainer.querySelector(BUTTONS_AREA_SELECTOR);
                 if (buttonContainer) {
                     addMicrophoneButton(inputElement, 'main');
                 }
@@ -626,7 +610,6 @@ function observeDOM() {
         observer.observe(targetNode, config);
 
         tryAddButton();
-
     } catch (error) {
         logError('Failed to observe DOM', error);
     }
@@ -641,9 +624,9 @@ async function init() {
         observeDOM();
         document.addEventListener('click', (event) => {
             const target = event.target;
-             if (target.closest(INPUT_SELECTOR)) {
+            if (target.closest(INPUT_SELECTOR)) {
                 tryAddButton();
-             }
+            }
         });
 
         console.log('[Whisper to ChatGPT] Extension initialized successfully');
