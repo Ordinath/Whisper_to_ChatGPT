@@ -21,12 +21,32 @@ const NON_PRO_MAIN_MICROPHONE_BUTTON_CLASSES =
 const SECONDARY_MICROPHONE_BUTTON_CLASSES =
     'flex h-9 w-9 items-center justify-center rounded-full bg-black text-white transition-colors hover:opacity-70 focus-visible:outline-none focus-visible:outline-black disabled:bg-[#D7D7D7] disabled:text-[#f4f4f4] disabled:hover:opacity-100 dark:bg-white dark:text-black dark:focus-visible:outline-white disabled:dark:bg-token-text-quaternary dark:disabled:text-token-main-surface-secondary';
 
-// --- Updated Constants for Selectors ---
-const INPUT_SELECTOR = 'div[contenteditable="true"][id="prompt-textarea"]';
+const PRIMARY_EDITOR_SELECTOR = '[role="textbox"][contenteditable="true"]';
+const LEGACY_EDITOR_SELECTOR =
+    '#prompt-textarea, [data-testid="prompt-textarea"][contenteditable], textarea[data-testid="prompt-textarea"]';
+const EDITOR_SELECTOR = `${PRIMARY_EDITOR_SELECTOR}, ${LEGACY_EDITOR_SELECTOR}`;
+const CHATGPT_COMPOSER_SELECTOR = 'form[data-type="unified-composer"], [data-type="unified-composer"], [data-testid="composer"]';
+const COMPOSER_CONTROL_SELECTOR =
+    '[data-testid="composer-speech-button-container"], [data-testid="composer-trailing-actions"], #composer-submit-button, button[data-testid="send-button"], button[aria-label="Dictate"], button[aria-label="Start dictation"], button[aria-label="Dictate button"], button[aria-label="Start Voice"]';
 const PARENT_CONTAINER_SELECTOR = '.grid.grid-cols-\\[auto_1fr_auto\\]';
 const BUTTONS_AREA_SELECTOR = '.\\[grid-area\\:trailing\\] .ms-auto.flex.items-center';
-const MIC_BUTTON_SELECTOR = '.microphone_button';
-// --- End Updated Constants ---
+const MIC_ROOT_ATTRIBUTE = 'data-whisper-to-chatgpt-root';
+const MIC_ROOT_SELECTOR = `[${MIC_ROOT_ATTRIBUTE}]`;
+const RUNTIME_STATE_ATTRIBUTE = 'data-whisper-to-chatgpt-runtime';
+
+const runtimeState = {
+    version: chrome.runtime.getManifest().version,
+    contentScriptLoaded: true,
+    initialized: false,
+    editorFound: false,
+    composerFound: false,
+    actionAreaFound: false,
+    controlCreated: false,
+    controlConnected: false,
+    controlVisible: false,
+    survivesRerender: false,
+    currentUrl: window.location.href,
+};
 
 const TESTING = false;
 
@@ -76,6 +96,241 @@ function logError(message, error) {
     console.error(`[Whisper to ChatGPT] ${message}`, error);
 }
 
+function updateRuntimeState(update = {}) {
+    Object.assign(runtimeState, update);
+    if (window.location?.href) {
+        runtimeState.currentUrl = window.location.href;
+    }
+    document?.documentElement?.setAttribute(RUNTIME_STATE_ATTRIBUTE, JSON.stringify(runtimeState));
+}
+
+function isControlVisible(control) {
+    if (!control?.isConnected || control.closest('[hidden], [aria-hidden="true"], [inert]')) {
+        return false;
+    }
+
+    const rect = control.getBoundingClientRect();
+    if (
+        rect.width <= 0 ||
+        rect.height <= 0 ||
+        rect.right <= 0 ||
+        rect.bottom <= 0 ||
+        rect.left >= window.innerWidth ||
+        rect.top >= window.innerHeight
+    ) {
+        return false;
+    }
+
+    for (let element = control; element; element = element.parentElement) {
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.opacity === '0') {
+            return false;
+        }
+    }
+
+    if (typeof document.elementsFromPoint === 'function') {
+        const centerX = Math.max(0, Math.min(window.innerWidth - 1, rect.left + rect.width / 2));
+        const centerY = Math.max(0, Math.min(window.innerHeight - 1, rect.top + rect.height / 2));
+        const hitStack = document.elementsFromPoint(centerX, centerY);
+        if (hitStack.length > 0 && !hitStack.some((element) => element === control || control.contains(element))) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+updateRuntimeState();
+
+function isElementVisible(element) {
+    if (!element?.isConnected || element.closest('[hidden], [aria-hidden="true"], [inert]')) {
+        return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    return style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse' && element.getClientRects().length > 0;
+}
+
+function isVisibleEditor(element) {
+    if (!isElementVisible(element)) {
+        return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        rect.right > 0 &&
+        rect.bottom > 0 &&
+        rect.left < window.innerWidth &&
+        rect.top < window.innerHeight
+    );
+}
+
+function getEditorFromTarget(target) {
+    if (!(target instanceof Element)) {
+        return null;
+    }
+    return target.matches(EDITOR_SELECTOR) ? target : target.closest(EDITOR_SELECTOR);
+}
+
+function getOrderedChatGPTEditors(preferredTarget = null) {
+    const primaryEditors = Array.from(document.querySelectorAll(PRIMARY_EDITOR_SELECTOR)).filter(isVisibleEditor);
+    const editors = primaryEditors.length
+        ? primaryEditors
+        : Array.from(document.querySelectorAll(LEGACY_EDITOR_SELECTOR)).filter(isVisibleEditor);
+    const preferredEditor = getEditorFromTarget(preferredTarget);
+    const activeEditor = getEditorFromTarget(document.activeElement);
+    const orderedEditors = [
+        preferredEditor,
+        activeEditor,
+        lastFocusedEditor,
+        mountedEditor,
+        ...editors.sort((left, right) => right.getBoundingClientRect().bottom - left.getBoundingClientRect().bottom),
+    ];
+
+    return orderedEditors.filter((editor, index) => editor && isVisibleEditor(editor) && orderedEditors.indexOf(editor) === index);
+}
+
+function findChatGPTEditor(preferredTarget = null) {
+    return getOrderedChatGPTEditors(preferredTarget)[0] || null;
+}
+
+function findChatGPTComposer(editor) {
+    if (!isVisibleEditor(editor)) {
+        return null;
+    }
+
+    const form = editor.closest('form');
+    if (form?.isConnected && isElementVisible(form)) {
+        return form;
+    }
+
+    const semanticComposer = editor.closest(CHATGPT_COMPOSER_SELECTOR);
+    return semanticComposer?.isConnected && isElementVisible(semanticComposer) ? semanticComposer : null;
+}
+
+function lowestCommonAncestor(firstElement, secondElement, boundary) {
+    if (!firstElement || !secondElement || !boundary?.contains(firstElement) || !boundary.contains(secondElement)) {
+        return null;
+    }
+
+    for (let ancestor = firstElement.parentElement; ancestor && ancestor !== boundary; ancestor = ancestor.parentElement) {
+        if (ancestor.contains(secondElement)) {
+            return ancestor;
+        }
+    }
+
+    return null;
+}
+
+function directChildContaining(container, element) {
+    let child = element;
+    while (child?.parentElement && child.parentElement !== container) {
+        child = child.parentElement;
+    }
+    return child?.parentElement === container ? child : null;
+}
+
+function findVisibleButton(composer, selector) {
+    return Array.from(composer.querySelectorAll(selector)).find(isElementVisible) || null;
+}
+
+function findControlGroup(control, composer) {
+    if (!control) {
+        return null;
+    }
+
+    for (let ancestor = control.parentElement; ancestor && ancestor !== composer; ancestor = ancestor.parentElement) {
+        const visibleButtons = Array.from(ancestor.querySelectorAll('button')).filter(isElementVisible);
+        if (visibleButtons.length >= 2 && isElementVisible(ancestor)) {
+            return ancestor;
+        }
+    }
+
+    return null;
+}
+
+function findChatGPTActionArea(composer) {
+    if (!composer?.isConnected || !isElementVisible(composer)) {
+        return null;
+    }
+
+    const dictateButton = findVisibleButton(composer, 'button[aria-label="Dictate"]');
+    const voiceButton = findVisibleButton(composer, 'button[aria-label="Start Voice"]');
+    const nativeControlsGroup = lowestCommonAncestor(dictateButton, voiceButton, composer);
+
+    if (nativeControlsGroup && isElementVisible(nativeControlsGroup)) {
+        return {
+            actions: nativeControlsGroup,
+            before: directChildContaining(nativeControlsGroup, dictateButton),
+            strategy: 'native-voice-controls',
+        };
+    }
+
+    const trailingActions = composer.querySelector('[data-testid="composer-trailing-actions"]');
+    if (trailingActions?.isConnected && isElementVisible(trailingActions)) {
+        const firstNativeControl = Array.from(trailingActions.children).find((child) => !child.matches(MIC_ROOT_SELECTOR));
+        return { actions: trailingActions, before: firstNativeControl || null, strategy: 'trailing-actions' };
+    }
+
+    const speechControl = findVisibleButton(
+        composer,
+        'button[aria-label="Dictate"], button[aria-label="Start dictation"], button[aria-label="Dictate button"], button[aria-label="Start Voice"]'
+    );
+    const speechGroup = findControlGroup(speechControl, composer);
+    if (speechGroup) {
+        return {
+            actions: speechGroup,
+            before: directChildContaining(speechGroup, speechControl),
+            strategy: 'native-control-group',
+        };
+    }
+
+    const submitButton = findVisibleButton(composer, '#composer-submit-button, button[data-testid="send-button"]');
+    const submitGroup = findControlGroup(submitButton, composer) || submitButton?.parentElement;
+    if (submitGroup?.isConnected && submitGroup !== composer && isElementVisible(submitGroup)) {
+        return {
+            actions: submitGroup,
+            before: directChildContaining(submitGroup, submitButton),
+            strategy: 'submit-control-group',
+        };
+    }
+
+    const legacyComposer = composer.matches(PARENT_CONTAINER_SELECTOR) ? composer : composer.querySelector(PARENT_CONTAINER_SELECTOR);
+    const legacyButtons = legacyComposer?.querySelector(BUTTONS_AREA_SELECTOR);
+    if (legacyButtons?.isConnected && isElementVisible(legacyButtons)) {
+        return { actions: legacyButtons, before: legacyButtons.firstElementChild, strategy: 'legacy-grid' };
+    }
+
+    return null;
+}
+
+function getChatGPTComposerContext(preferredTarget = null) {
+    const primaryEditor = findChatGPTEditor(preferredTarget);
+    const editors = [primaryEditor, ...getOrderedChatGPTEditors(preferredTarget)].filter(
+        (editor, index, candidates) => editor && candidates.indexOf(editor) === index
+    );
+    let composerFound = false;
+
+    for (const editor of editors) {
+        const composer = findChatGPTComposer(editor);
+        if (!composer) {
+            continue;
+        }
+        composerFound = true;
+
+        const actionArea = findChatGPTActionArea(composer);
+        if (actionArea) {
+            updateRuntimeState({ editorFound: true, composerFound: true, actionAreaFound: true });
+            return { editor, composer, ...actionArea };
+        }
+    }
+
+    updateRuntimeState({ editorFound: editors.length > 0, composerFound, actionAreaFound: false });
+    return null;
+}
+
 async function retrieveFromStorage(key) {
     return new Promise((resolve) => {
         chrome.storage.sync.get(key, function (result) {
@@ -94,38 +349,30 @@ class AudioRecorder {
         this.snippetButtons = [];
         this.popupContainer = null;
         this.activePopup = null;
+        this.keyboardShortcutListening = false;
     }
 
     async listenForKeyboardShortcut() {
+        if (this.keyboardShortcutListening) {
+            return;
+        }
+        this.keyboardShortcutListening = true;
+
         if (await this.shortcutEnabled()) {
             const shortcutFirstKey = await retrieveFromStorage('config_shortcut_first_key');
             const shortcutFirstModifier = await retrieveFromStorage('config_shortcut_first_modifier');
             const shortcutSecondModifier = await retrieveFromStorage('config_shortcut_second_modifier');
             document.addEventListener('keydown', (event) => {
-                if (event.code === `Key${shortcutFirstKey.toUpperCase()}`) {
+                if (!event.repeat && shortcutFirstKey && event.code === `Key${shortcutFirstKey.toUpperCase()}`) {
                     // console.log(event);
                     if (shortcutFirstModifier && shortcutFirstModifier !== 'none' && !event[shortcutFirstModifier]) return;
                     if (shortcutSecondModifier && shortcutSecondModifier !== 'none' && !event[shortcutSecondModifier]) return;
 
                     event.preventDefault();
 
-                    // Find our microphone button based on the new UI structure
-                    const micButton = document.querySelector('.microphone_button');
-                    if (micButton) {
-                        micButton.click();
-                    } else {
-                        // If our button doesn't exist yet, try to find the input and add it
-                        const promptTextarea = document.querySelector('div[contenteditable="true"][id="prompt-textarea"]');
-                        if (promptTextarea) {
-                            addMicrophoneButton(promptTextarea, 'main');
-                            // Give a small delay to ensure the button is added
-                            setTimeout(() => {
-                                const newMicButton = document.querySelector('.microphone_button');
-                                if (newMicButton) {
-                                    newMicButton.click();
-                                }
-                            }, 100);
-                        }
+                    addMicrophoneButton(document.activeElement, 'main');
+                    if (this.micButton?.isConnected) {
+                        this.micButton.click();
                     }
                 }
             });
@@ -134,6 +381,10 @@ class AudioRecorder {
 
     createMicButton(inputType, version) {
         this.micButton = document.createElement('button');
+        this.micButton.type = 'button';
+        this.micButton.dataset.whisperToChatgptControl = 'button';
+        this.micButton.setAttribute('aria-label', 'Record with Whisper');
+        this.micButton.title = 'Record with Whisper';
         if (inputType === 'main') {
             this.micButton.className = `microphone_button ${version === 'PRO' ? PRO_MAIN_MICROPHONE_BUTTON_CLASSES : NON_PRO_MAIN_MICROPHONE_BUTTON_CLASSES}`;
         } else {
@@ -510,124 +761,208 @@ class AudioRecorder {
     }
 }
 
-// First, let's create a singleton recorder instance
 let globalRecorder = null;
+let microphoneMount = null;
+let mountedEditor = null;
+let mountedComposer = null;
+let lastFocusedEditor = null;
+let composerObserver = null;
+let pendingReconcileFrame = null;
+let pendingPreferredEditor = null;
+let initialized = false;
 
-function addMicrophoneButton(inputElement, inputType) {
+function ensureGlobalRecorder() {
+    if (!globalRecorder) {
+        globalRecorder = new AudioRecorder();
+        globalRecorder.listenForKeyboardShortcut();
+    }
+    return globalRecorder;
+}
+
+function createMicrophoneMount(inputType) {
+    const recorder = ensureGlobalRecorder();
+    recorder.createMicButton(inputType, 'NON-PRO');
+
+    const wrapper = document.createElement('div');
+    wrapper.id = 'whisper-to-chatgpt-control-root';
+    wrapper.setAttribute(MIC_ROOT_ATTRIBUTE, '');
+    wrapper.className = 'whisper-mic-wrapper relative flex items-center';
+
+    const popupContainer = document.createElement('div');
+    popupContainer.className = 'whitespace-nowrap z-10';
+    popupContainer.style.position = 'absolute';
+    popupContainer.style.bottom = '0';
+    popupContainer.style.right = '100%';
+    popupContainer.style.marginRight = '0.5rem';
+
+    const micContainer = document.createElement('div');
+    micContainer.className = 'whisper-mic-container min-w-9';
+    micContainer.appendChild(recorder.micButton);
+
+    wrapper.appendChild(popupContainer);
+    wrapper.appendChild(micContainer);
+    recorder.popupContainer = popupContainer;
+    updateRuntimeState({ controlCreated: true });
+
+    return { wrapper, popupContainer };
+}
+
+function addMicrophoneButton(preferredTarget = null, inputType = 'main') {
     try {
-        // Check if button already exists using the constant selector
-        if (document.querySelector(MIC_BUTTON_SELECTOR)) {
-            return;
+        const context = getChatGPTComposerContext(preferredTarget);
+        if (!context) {
+            microphoneMount?.wrapper.remove();
+            mountedEditor = null;
+            mountedComposer = null;
+            updateRuntimeState({
+                controlCreated: Boolean(microphoneMount),
+                controlConnected: false,
+                controlVisible: false,
+                survivesRerender: false,
+            });
+            return false;
         }
 
-        // Find the parent container using the constant selector
-        // This parent is crucial for correctly locating the buttonsArea
-        const overallInputAndButtonContainer = inputElement.closest(PARENT_CONTAINER_SELECTOR);
-        if (!overallInputAndButtonContainer) {
-            return;
+        const recorder = ensureGlobalRecorder();
+        if (!microphoneMount) {
+            microphoneMount = createMicrophoneMount(inputType);
         }
 
-        // Find the new buttons area within the overall container
-        const buttonsArea = overallInputAndButtonContainer.querySelector(BUTTONS_AREA_SELECTOR);
-        if (!buttonsArea) {
-            return;
+        document.querySelectorAll(MIC_ROOT_SELECTOR).forEach((root) => {
+            if (root !== microphoneMount.wrapper) {
+                root.remove();
+            }
+        });
+
+        const { editor, composer, actions, before, strategy } = context;
+        const { wrapper } = microphoneMount;
+        const insertionReference = before === wrapper ? wrapper.nextSibling : before;
+        const needsMove = wrapper.parentElement !== actions || (insertionReference && wrapper.nextSibling !== insertionReference);
+
+        if (needsMove) {
+            actions.insertBefore(wrapper, insertionReference);
         }
 
-        // Create or reuse the global recorder
-        if (!globalRecorder) {
-            globalRecorder = new AudioRecorder();
-            globalRecorder.textarea = inputElement;
-            globalRecorder.listenForKeyboardShortcut();
-        } else {
-            globalRecorder.textarea = inputElement;
-        }
+        wrapper.dataset.whisperMountStrategy = strategy;
+        recorder.textarea = editor;
+        recorder.popupContainer = microphoneMount.popupContainer;
+        mountedEditor = editor;
+        mountedComposer = composer;
+        updateRuntimeState({
+            controlCreated: true,
+            controlConnected: recorder.micButton.isConnected,
+            controlVisible: isControlVisible(recorder.micButton),
+        });
 
-        // Create the microphone button
-        globalRecorder.createMicButton(inputType, 'NON-PRO');
-
-        // Create the wrapper for the mic button and popup
-        const micWrapper = document.createElement('div');
-        micWrapper.className = 'relative flex items-center';
-
-        // Create container for popup messages, positioned absolutely using inline styles
-        const popupContainer = document.createElement('div');
-        popupContainer.className = 'whitespace-nowrap z-10';
-        popupContainer.style.position = 'absolute';
-        popupContainer.style.bottom = '0';
-        popupContainer.style.right = '100%';
-        popupContainer.style.marginRight = '0.5rem';
-
-        // Create the container for just the mic button
-        const micContainer = document.createElement('div');
-        micContainer.className = 'min-w-9';
-        micContainer.appendChild(globalRecorder.micButton);
-
-        // Append popup and mic containers to the wrapper
-        micWrapper.appendChild(popupContainer);
-        micWrapper.appendChild(micContainer);
-
-        // Insert the complete wrapper into the buttons area
-        buttonsArea.insertBefore(micWrapper, buttonsArea.firstChild);
-        globalRecorder.popupContainer = popupContainer;
+        window.setTimeout(() => {
+            updateRuntimeState({
+                controlConnected: recorder.micButton.isConnected,
+                controlVisible: isControlVisible(recorder.micButton),
+                survivesRerender: recorder.micButton.isConnected && document.contains(recorder.micButton),
+            });
+        }, 250);
+        return true;
     } catch (error) {
         console.log('[Whisper to ChatGPT] Non-critical error in button addition:', error);
+        return false;
     }
 }
 
-// --- Updated Helper function for adding the button ---
-function tryAddButton() {
-    try {
-        if (document.querySelector(MIC_BUTTON_SELECTOR)) {
-            return;
+function scheduleComposerReconcile(preferredTarget = null) {
+    const preferredEditor = getEditorFromTarget(preferredTarget);
+    if (preferredEditor) {
+        pendingPreferredEditor = preferredEditor;
+    }
+
+    if (pendingReconcileFrame !== null) {
+        return;
+    }
+
+    pendingReconcileFrame = window.requestAnimationFrame(() => {
+        pendingReconcileFrame = null;
+        const target = pendingPreferredEditor;
+        pendingPreferredEditor = null;
+        addMicrophoneButton(target, 'main');
+    });
+}
+
+function elementHasComposerSignal(node) {
+    if (!(node instanceof Element)) {
+        return false;
+    }
+
+    const signalSelector = `${EDITOR_SELECTOR}, ${CHATGPT_COMPOSER_SELECTOR}, ${COMPOSER_CONTROL_SELECTOR}, ${MIC_ROOT_SELECTOR}`;
+    return node.matches(signalSelector) || Boolean(node.querySelector(signalSelector));
+}
+
+function mutationsAffectComposer(mutations) {
+    return mutations.some((mutation) => {
+        if (mutation.type === 'attributes') {
+            const target = mutation.target;
+            return (
+                elementHasComposerSignal(target) ||
+                (target instanceof Element && Boolean(target.querySelector(EDITOR_SELECTOR))) ||
+                target === mountedComposer ||
+                target === mountedEditor
+            );
         }
 
-        const inputElement = document.querySelector(INPUT_SELECTOR);
-        if (inputElement) {
-            const overallInputAndButtonContainer = inputElement.closest(PARENT_CONTAINER_SELECTOR);
-            if (overallInputAndButtonContainer) {
-                const buttonContainer = overallInputAndButtonContainer.querySelector(BUTTONS_AREA_SELECTOR);
-                if (buttonContainer) {
-                    addMicrophoneButton(inputElement, 'main');
-                }
-            }
-        }
-    } catch (error) {
-        console.log('[Whisper to ChatGPT] Non-critical error in tryAddButton:', error);
-    }
+        return [...mutation.addedNodes, ...mutation.removedNodes].some(elementHasComposerSignal);
+    });
 }
-// --- End Updated Helper ---
 
 function observeDOM() {
     try {
-        const targetNode = document.body;
-        const config = { childList: true, subtree: true };
+        if (composerObserver) {
+            return;
+        }
 
-        const callback = function (mutationsList, observer) {
-            tryAddButton();
-        };
+        composerObserver = new MutationObserver((mutations) => {
+            if (microphoneMount && !microphoneMount.wrapper.isConnected) {
+                updateRuntimeState({ controlConnected: false, controlVisible: false, survivesRerender: false });
+            }
+            if (mutationsAffectComposer(mutations)) {
+                scheduleComposerReconcile();
+            }
+        });
+        composerObserver.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['hidden', 'aria-hidden', 'inert', 'class', 'style'],
+        });
 
-        const observer = new MutationObserver(callback);
-        observer.observe(targetNode, config);
-
-        tryAddButton();
+        scheduleComposerReconcile();
     } catch (error) {
         logError('Failed to observe DOM', error);
     }
 }
 
+function handleComposerInteraction(event) {
+    const editor = getEditorFromTarget(event.target);
+    if (editor) {
+        lastFocusedEditor = editor;
+        scheduleComposerReconcile(editor);
+    }
+}
+
 async function init() {
     try {
+        if (initialized) {
+            return;
+        }
+        initialized = true;
+        updateRuntimeState({ initialized: true });
+
         if (TESTING) {
             chrome.storage.sync.clear();
         }
 
+        ensureGlobalRecorder();
         observeDOM();
-        document.addEventListener('click', (event) => {
-            const target = event.target;
-            if (target.closest(INPUT_SELECTOR)) {
-                tryAddButton();
-            }
-        });
+        document.addEventListener('click', handleComposerInteraction);
+        document.addEventListener('focusin', handleComposerInteraction);
+        window.addEventListener('popstate', () => scheduleComposerReconcile());
 
         console.log('[Whisper to ChatGPT] Extension initialized successfully');
     } catch (error) {
