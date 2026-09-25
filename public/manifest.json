@@ -13,7 +13,8 @@
         {
             "matches": [
                 "https://chat.openai.com/*",
-                "https://chatgpt.com/*"
+                "https://chatgpt.com/*",
+                "https://www.chatgpt.com/*"
             ],
             "js": [
                 "content.js"
